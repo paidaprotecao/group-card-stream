@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Download, Plug, RefreshCw } from "lucide-react";
+import { Download, Plug, RefreshCw, Send } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { syncUazapiGroups } from "@/lib/uazapi.functions";
@@ -154,8 +154,15 @@ function KanbanPage() {
               Atualizar
             </button>
             <Link
-              to="/integracao"
+              to="/disparo"
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              <Send className="size-3.5" />
+              Disparo avulso
+            </Link>
+            <Link
+              to="/integracao"
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
             >
               <Plug className="size-3.5" />
               Integração n8n
