@@ -1,9 +1,9 @@
 export type DisparoInput = {
   text: string;
-  fileUrl?: string | null;
-  mediaType?: string | null;
-  docName?: string | null;
-  delayMs?: number | null;
+  fileUrl?: string | null | undefined;
+  mediaType?: string | null | undefined;
+  docName?: string | null | undefined;
+  delayMs?: number | null | undefined;
 };
 
 export type DisparoResultado = {
