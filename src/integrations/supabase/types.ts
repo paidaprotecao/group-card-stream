@@ -14,7 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      wa_groups: {
+        Row: {
+          ativo: boolean
+          categoria: string
+          chat_id: string
+          created_at: string | null
+          group_name: string | null
+          id: string
+          last_seen_at: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          categoria?: string
+          chat_id: string
+          created_at?: string | null
+          group_name?: string | null
+          id?: string
+          last_seen_at?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          categoria?: string
+          chat_id?: string
+          created_at?: string | null
+          group_name?: string | null
+          id?: string
+          last_seen_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
