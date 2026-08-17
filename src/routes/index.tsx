@@ -4,7 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plug, RefreshCw } from "lucide-react";
+import { Download, Plug, RefreshCw } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+
+import { syncUazapiGroups } from "@/lib/uazapi.functions";
 
 import { GroupCard } from "@/components/GroupCard";
 import { KanbanColumn } from "@/components/KanbanColumn";
@@ -48,6 +51,27 @@ function KanbanPage() {
     queryFn: fetchGroups,
   });
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const syncGroups = useServerFn(syncUazapiGroups);
+
+  async function handleSync() {
+    setSyncing(true);
+    try {
+      const result = await syncGroups();
+      if (!result.ok) {
+        toast.error("Falha na sincronização", { description: result.error });
+        return;
+      }
+      toast.success("Grupos sincronizados", {
+        description: `${result.total} grupos na uazapi · ${result.inserted} novos · ${result.updated} atualizados`,
+      });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    } catch (err) {
+      toast.error("Falha na sincronização", { description: (err as Error).message });
+    } finally {
+      setSyncing(false);
+    }
+  }
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   useEffect(() => {
@@ -112,6 +136,15 @@ function KanbanPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void handleSync()}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+            >
+              <Download className={syncing ? "size-3.5 animate-pulse" : "size-3.5"} />
+              {syncing ? "Buscando..." : "Buscar grupos (uazapi)"}
+            </button>
             <button
               type="button"
               onClick={() => void refetch()}
