@@ -60,8 +60,8 @@ function IntegracaoPage() {
   "last_seen_at": "{{ $now.toISO() }}"
 }`;
   const upsertCurl = `curl -X POST "${restEndpoint}?on_conflict=chat_id" \\
-  -H "apikey: <SERVICE_ROLE_KEY>" \\
-  -H "Authorization: Bearer <SERVICE_ROLE_KEY>" \\
+  -H "apikey: ${anonKey}" \\
+  -H "Authorization: Bearer ${anonKey}" \\
   -H "Content-Type: application/json" \\
   -H "Prefer: resolution=merge-duplicates" \\
   -d '${exampleBody.replace(/\n\s*/g, " ")}'`;
@@ -106,15 +106,16 @@ function IntegracaoPage() {
         <CopyRow label="Exemplo completo (curl)" value={upsertCurl} help="Para testar rapidamente" />
 
         <div className="rounded-lg border border-border bg-secondary/60 p-4 text-sm text-foreground">
-          <p className="font-semibold">Sobre a chave de serviço (insert)</p>
+          <p className="font-semibold">Qual chave usar no n8n</p>
           <p className="mt-1 text-muted-foreground">
-            Inserir novas linhas exige a chave de serviço, que é secreta e por isso não é exibida
-            nesta página — qualquer visitante teria acesso total de escrita. Em projetos no Lovable
-            Cloud essa chave e a senha do banco não ficam disponíveis; para o n8n use a chave pública
-            acima para leitura/atualização, ou me avise que eu crio um endpoint próprio no app
-            (protegido por um token só seu) para o n8n inserir os grupos novos.
+            A chave pública acima já é suficiente: ela permite inserir, ler e atualizar grupos em{" "}
+            <code className="font-mono">wa_groups</code> (o app é aberto, sem login). Basta enviá-la
+            nos headers <code className="font-mono">apikey</code> e{" "}
+            <code className="font-mono">Authorization: Bearer</code>. A chave de serviço e a senha do
+            banco não ficam disponíveis neste tipo de projeto — e não são necessárias aqui.
           </p>
         </div>
+
       </div>
     </main>
   );
