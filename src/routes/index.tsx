@@ -53,7 +53,28 @@ function KanbanPage() {
   });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [limpando, setLimpando] = useState(false);
   const syncGroups = useServerFn(syncUazapiGroups);
+  const limparChats = useServerFn(limparChatsAgora);
+
+  async function handleLimparChats() {
+    setLimpando(true);
+    try {
+      const result = await limparChats();
+      if (!result.ok) {
+        toast.error("Falha ao limpar chats", { description: result.error });
+        return;
+      }
+      toast.success("Chats limpos", {
+        description: `${result.limpos}/${result.total} grupos ativos · ${result.falhas} falhas`,
+      });
+    } catch (err) {
+      toast.error("Falha ao limpar chats", { description: (err as Error).message });
+    } finally {
+      setLimpando(false);
+    }
+  }
+
 
   async function handleSync() {
     setSyncing(true);
