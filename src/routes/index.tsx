@@ -4,10 +4,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Download, Plug, RefreshCw, Send } from "lucide-react";
+import { Download, Eraser, Plug, RefreshCw, Send } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { syncUazapiGroups } from "@/lib/uazapi.functions";
+import { limparChatsAgora } from "@/lib/limpar-chats.functions";
 
 import { GroupCard } from "@/components/GroupCard";
 import { KanbanColumn } from "@/components/KanbanColumn";
@@ -52,7 +53,28 @@ function KanbanPage() {
   });
   const [activeId, setActiveId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [limpando, setLimpando] = useState(false);
   const syncGroups = useServerFn(syncUazapiGroups);
+  const limparChats = useServerFn(limparChatsAgora);
+
+  async function handleLimparChats() {
+    setLimpando(true);
+    try {
+      const result = await limparChats();
+      if (!result.ok) {
+        toast.error("Falha ao limpar chats", { description: result.error });
+        return;
+      }
+      toast.success("Chats limpos", {
+        description: `${result.limpos}/${result.total} grupos ativos · ${result.falhas} falhas`,
+      });
+    } catch (err) {
+      toast.error("Falha ao limpar chats", { description: (err as Error).message });
+    } finally {
+      setLimpando(false);
+    }
+  }
+
 
   async function handleSync() {
     setSyncing(true);
@@ -144,6 +166,16 @@ function KanbanPage() {
             >
               <Download className={syncing ? "size-3.5 animate-pulse" : "size-3.5"} />
               {syncing ? "Buscando..." : "Buscar grupos (uazapi)"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleLimparChats()}
+              disabled={limpando}
+              title="Limpa o histórico de mensagens dos grupos ativos (roda automaticamente a cada 15 min)"
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+            >
+              <Eraser className={limpando ? "size-3.5 animate-pulse" : "size-3.5"} />
+              {limpando ? "Limpando..." : "Limpar chats"}
             </button>
             <button
               type="button"
