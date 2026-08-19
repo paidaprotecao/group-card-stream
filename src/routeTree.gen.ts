@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DisparoRouteImport } from './routes/disparo'
 import { Route as IntegracaoRouteImport } from './routes/integracao'
+import { Route as ApiPublicHooksLimparChatsRouteImport } from './routes/api/public/hooks/limpar-chats'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,50 @@ const IntegracaoRoute = IntegracaoRouteImport.update({
   path: '/integracao',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksLimparChatsRoute =
+  ApiPublicHooksLimparChatsRouteImport.update({
+    id: '/api/public/hooks/limpar-chats',
+    path: '/api/public/hooks/limpar-chats',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
   '/integracao': typeof IntegracaoRoute
+  '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
   '/integracao': typeof IntegracaoRoute
+  '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
   '/integracao': typeof IntegracaoRoute
+  '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/disparo' | '/integracao'
+  fullPaths: '/' | '/disparo' | '/integracao' | '/api/public/hooks/limpar-chats'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/disparo' | '/integracao'
-  id: '__root__' | '/' | '/disparo' | '/integracao'
+  to: '/' | '/disparo' | '/integracao' | '/api/public/hooks/limpar-chats'
+  id:
+    | '__root__'
+    | '/'
+    | '/disparo'
+    | '/integracao'
+    | '/api/public/hooks/limpar-chats'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DisparoRoute: typeof DisparoRoute
   IntegracaoRoute: typeof IntegracaoRoute
+  ApiPublicHooksLimparChatsRoute: typeof ApiPublicHooksLimparChatsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +98,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IntegracaoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/limpar-chats': {
+      id: '/api/public/hooks/limpar-chats'
+      path: '/api/public/hooks/limpar-chats'
+      fullPath: '/api/public/hooks/limpar-chats'
+      preLoaderRoute: typeof ApiPublicHooksLimparChatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +112,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DisparoRoute: DisparoRoute,
   IntegracaoRoute: IntegracaoRoute,
+  ApiPublicHooksLimparChatsRoute: ApiPublicHooksLimparChatsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
