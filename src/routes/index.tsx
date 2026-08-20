@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Download, Eraser, Plug, RefreshCw, Send } from "lucide-react";
+import { Download, Eraser, Plug, RefreshCw, Send, Truck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { syncUazapiGroups } from "@/lib/uazapi.functions";
