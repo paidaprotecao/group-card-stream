@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      grupos_caminhao: {
+        Row: {
+          created_at: string
+          group_name: string | null
+          hits: number
+          id: string
+          invite_code: string
+          invite_url: string
+          last_seen_at: string
+          message_text: string | null
+          sender: string | null
+          source_chat_id: string | null
+          source_group_name: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          group_name?: string | null
+          hits?: number
+          id?: string
+          invite_code: string
+          invite_url: string
+          last_seen_at?: string
+          message_text?: string | null
+          sender?: string | null
+          source_chat_id?: string | null
+          source_group_name?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          group_name?: string | null
+          hits?: number
+          id?: string
+          invite_code?: string
+          invite_url?: string
+          last_seen_at?: string
+          message_text?: string | null
+          sender?: string | null
+          source_chat_id?: string | null
+          source_group_name?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       wa_groups: {
         Row: {
           ativo: boolean

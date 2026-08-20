@@ -1,0 +1,1 @@
+DELETE FROM public.grupos_caminhao WHERE invite_code = 'ABCdef123456789xyz';
