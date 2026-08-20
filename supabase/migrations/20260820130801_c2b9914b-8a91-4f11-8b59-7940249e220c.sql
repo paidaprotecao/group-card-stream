@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS grupos_caminhao_group_jid_key ON public.grupos_caminhao (group_jid) WHERE group_jid IS NOT NULL;

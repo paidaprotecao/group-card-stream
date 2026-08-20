@@ -87,12 +87,38 @@ export async function preencherInfoDoConvite(
   const nowIso = new Date().toISOString();
   try {
     const info = await fetchInviteInfo(inviteCode);
+
+    // Mesmo grupo pode chegar por convites diferentes: se o JID já existe, junta na linha antiga.
+    if (info.group_jid) {
+      const { data: existente } = await supabaseAdmin
+        .from("grupos_caminhao")
+        .select("id, hits")
+        .eq("group_jid", info.group_jid)
+        .neq("id", rowId)
+        .maybeSingle();
+      if (existente) {
+        await supabaseAdmin
+          .from("grupos_caminhao")
+          .update({
+            ...info,
+            hits: (existente.hits ?? 1) + 1,
+            last_seen_at: nowIso,
+            info_fetched_at: nowIso,
+            info_error: null,
+          })
+          .eq("id", existente.id);
+        await supabaseAdmin.from("grupos_caminhao").delete().eq("id", rowId);
+        return { ok: true };
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from("grupos_caminhao")
       .update({ ...info, info_fetched_at: nowIso, info_error: null })
       .eq("id", rowId);
     if (error) throw new Error(error.message);
     return { ok: true };
+
   } catch (err) {
     const message = (err as Error).message;
     await supabaseAdmin
