@@ -106,6 +106,7 @@ export async function registrarLinksDoPayload(payload: unknown): Promise<Registr
   const nowIso = new Date().toISOString();
   let novos = 0;
   let repetidos = 0;
+  const novosCodigos: string[] = [];
 
   for (const invite of invites.values()) {
     const found = existentesMap.get(invite.code);
@@ -133,6 +134,20 @@ export async function registrarLinksDoPayload(payload: unknown): Promise<Registr
       continue;
     }
     novos += 1;
+    novosCodigos.push(invite.code);
+  }
+
+  if (novosCodigos.length > 0) {
+    // Grupo novo: busca as informações reais do grupo na uazapi (nome, dono, participantes).
+    const { preencherInfoDoConvite } = await import("@/lib/invite-info.server");
+    const { data: inseridos } = await supabaseAdmin
+      .from("grupos_caminhao")
+      .select("id, invite_code")
+      .in("invite_code", novosCodigos);
+    for (const row of inseridos ?? []) {
+      const result = await preencherInfoDoConvite(row.id, row.invite_code);
+      if (!result.ok) console.error(`[grupos-caminhao] inviteInfo ${row.invite_code}:`, result.error);
+    }
   }
 
   return { ok: true, encontrados: invites.size, novos, repetidos, codigos: codes };
