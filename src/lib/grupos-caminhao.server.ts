@@ -1,6 +1,7 @@
 // Server-only: extrai convites de grupos de WhatsApp de um payload de webhook e grava no banco.
 
 const INVITE_REGEX = /https?:\/\/chat\.whatsapp\.com\/(?:invite\/)?([0-9A-Za-z]{15,30})/gi;
+const HAS_INVITE = /https?:\/\/chat\.whatsapp\.com\//i;
 
 export type InviteFound = { code: string; url: string };
 
@@ -62,7 +63,7 @@ export async function registrarLinksDoPayload(payload: unknown): Promise<Registr
       "body",
       "conteudo",
       "messageText",
-    ]) ?? texts.find((t) => INVITE_REGEX.test(t)) ?? null;
+    ]) ?? texts.find((t) => HAS_INVITE.test(t)) ?? null;
 
   const sourceChatId = pick(payload, [
     "chatid",
