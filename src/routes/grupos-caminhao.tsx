@@ -2,7 +2,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Copy, ExternalLink, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, ExternalLink, Info, RefreshCw, Trash2, Users, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+
+import { buscarInfosPendentes } from "@/lib/invite-info.functions";
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +33,12 @@ type LinkRow = {
   invite_code: string;
   invite_url: string;
   group_name: string | null;
+  group_jid: string | null;
+  group_description: string | null;
+  group_owner: string | null;
+  participants_count: number | null;
+  info_fetched_at: string | null;
+  info_error: string | null;
   status: string;
   source_chat_id: string | null;
   source_group_name: string | null;
@@ -60,6 +69,25 @@ async function fetchLinks(): Promise<LinkRow[]> {
 function GruposCaminhaoPage() {
   const queryClient = useQueryClient();
   const [filtro, setFiltro] = useState<string>("novo");
+  const [buscando, setBuscando] = useState(false);
+  const buscarInfos = useServerFn(buscarInfosPendentes);
+
+  async function handleBuscarInfos() {
+    setBuscando(true);
+    try {
+      const r = await buscarInfos({});
+      if (r.total === 0) toast.info("Nenhum convite pendente de consulta");
+      else
+        toast.success(`${r.ok} de ${r.total} grupos consultados`, {
+          description: r.falhas > 0 ? `${r.falhas} convites não retornaram dados` : undefined,
+        });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+    } catch (err) {
+      toast.error("Falha ao consultar", { description: (err as Error).message });
+    } finally {
+      setBuscando(false);
+    }
+  }
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchLinks,
@@ -125,6 +153,15 @@ function GruposCaminhaoPage() {
               <RefreshCw className={isFetching ? "size-3.5 animate-spin" : "size-3.5"} />
               Atualizar
             </button>
+            <button
+              type="button"
+              onClick={() => void handleBuscarInfos()}
+              disabled={buscando}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+            >
+              <Info className={buscando ? "size-3.5 animate-pulse" : "size-3.5"} />
+              Buscar infos
+            </button>
             <Link
               to="/"
               className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
@@ -177,7 +214,28 @@ function GruposCaminhaoPage() {
               <li key={row.id} className="rounded-lg border border-border bg-card p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 space-y-1">
-                    <p className="truncate font-mono text-xs text-foreground">{row.invite_url}</p>
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {row.group_name ?? "Grupo sem nome consultado"}
+                    </p>
+                    {row.group_jid || row.participants_count !== null ? (
+                      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        {row.participants_count !== null ? (
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="size-3" />
+                            {row.participants_count}
+                          </span>
+                        ) : null}
+                        {row.group_jid ? (
+                          <span className="font-mono">{row.group_jid}</span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                    {row.group_description ? (
+                      <p className="line-clamp-2 text-xs text-muted-foreground/80">
+                        {row.group_description}
+                      </p>
+                    ) : null}
+                    <p className="truncate font-mono text-xs text-muted-foreground">{row.invite_url}</p>
                     <p className="text-xs text-muted-foreground">
                       {row.source_group_name ?? row.source_chat_id ?? "origem desconhecida"}
                       {row.sender ? ` · ${row.sender}` : ""}

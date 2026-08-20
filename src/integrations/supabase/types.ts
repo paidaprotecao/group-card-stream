@@ -17,13 +17,19 @@ export type Database = {
       grupos_caminhao: {
         Row: {
           created_at: string
+          group_description: string | null
+          group_jid: string | null
           group_name: string | null
+          group_owner: string | null
           hits: number
           id: string
+          info_error: string | null
+          info_fetched_at: string | null
           invite_code: string
           invite_url: string
           last_seen_at: string
           message_text: string | null
+          participants_count: number | null
           sender: string | null
           source_chat_id: string | null
           source_group_name: string | null
@@ -31,13 +37,19 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          group_description?: string | null
+          group_jid?: string | null
           group_name?: string | null
+          group_owner?: string | null
           hits?: number
           id?: string
+          info_error?: string | null
+          info_fetched_at?: string | null
           invite_code: string
           invite_url: string
           last_seen_at?: string
           message_text?: string | null
+          participants_count?: number | null
           sender?: string | null
           source_chat_id?: string | null
           source_group_name?: string | null
@@ -45,13 +57,19 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          group_description?: string | null
+          group_jid?: string | null
           group_name?: string | null
+          group_owner?: string | null
           hits?: number
           id?: string
+          info_error?: string | null
+          info_fetched_at?: string | null
           invite_code?: string
           invite_url?: string
           last_seen_at?: string
           message_text?: string | null
+          participants_count?: number | null
           sender?: string | null
           source_chat_id?: string | null
           source_group_name?: string | null
