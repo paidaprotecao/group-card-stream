@@ -1,8 +1,8 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Copy, ExternalLink, Info, RefreshCw, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, ExternalLink, Info, RefreshCw, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import { buscarInfosPendentes } from "@/lib/invite-info.functions";
@@ -50,6 +50,7 @@ type LinkRow = {
 };
 
 const QUERY_KEY = ["grupos_caminhao"];
+const MEUS_KEY = ["wa_groups_chat_ids"];
 
 const STATUS = [
   { id: "novo", label: "Novos" },
@@ -66,10 +67,17 @@ async function fetchLinks(): Promise<LinkRow[]> {
   return (data ?? []) as LinkRow[];
 }
 
+async function fetchMeusChatIds(): Promise<string[]> {
+  const { data, error } = await supabase.from("wa_groups").select("chat_id");
+  if (error) throw error;
+  return (data ?? []).map((r) => r.chat_id);
+}
+
 function GruposCaminhaoPage() {
   const queryClient = useQueryClient();
   const [filtro, setFiltro] = useState<string>("novo");
   const [buscando, setBuscando] = useState(false);
+  const [selecionados, setSelecionados] = useState<string[]>([]);
   const buscarInfos = useServerFn(buscarInfosPendentes);
 
   async function handleBuscarInfos() {
@@ -88,10 +96,14 @@ function GruposCaminhaoPage() {
       setBuscando(false);
     }
   }
+
   const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchLinks,
   });
+  const { data: meusChatIds } = useQuery({ queryKey: MEUS_KEY, queryFn: fetchMeusChatIds });
+
+  const meus = useMemo(() => new Set(meusChatIds ?? []), [meusChatIds]);
 
   useEffect(() => {
     const channel = supabase
@@ -107,6 +119,20 @@ function GruposCaminhaoPage() {
 
   const rows = data ?? [];
   const visible = rows.filter((r) => r.status === filtro);
+  const visibleIds = visible.map((r) => r.id);
+  const selecionadosVisiveis = selecionados.filter((id) => visibleIds.includes(id));
+  const todosSelecionados = visible.length > 0 && selecionadosVisiveis.length === visible.length;
+  const selectedRows = visible.filter((r) => selecionados.includes(r.id));
+
+  function toggleRow(id: string) {
+    setSelecionados((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function toggleTodos() {
+    setSelecionados(todosSelecionados ? [] : visibleIds);
+  }
 
   async function setStatus(row: LinkRow, status: string) {
     const { error: updateError } = await supabase
@@ -120,24 +146,28 @@ function GruposCaminhaoPage() {
     void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
   }
 
-  async function remove(row: LinkRow) {
-    const { error: delError } = await supabase.from("grupos_caminhao").delete().eq("id", row.id);
-    if (delError) {
-      toast.error("Não foi possível remover", { description: delError.message });
-      return;
-    }
-    void queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+  async function copy(text: string, label = "Link copiado") {
+    await navigator.clipboard.writeText(text);
+    toast.success(label);
   }
 
-  async function copy(text: string) {
-    await navigator.clipboard.writeText(text);
-    toast.success("Link copiado");
+  async function copiarSelecionados() {
+    if (selectedRows.length === 0) return;
+    await copy(
+      selectedRows.map((r) => r.invite_url).join("\n"),
+      `${selectedRows.length} link(s) copiado(s)`,
+    );
+  }
+
+  function abrirSelecionados() {
+    if (selectedRows.length === 0) return;
+    for (const r of selectedRows) window.open(r.invite_url, "_blank", "noopener,noreferrer");
   }
 
   return (
     <main className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
-        <div className="mx-auto flex max-w-[1000px] flex-wrap items-center justify-between gap-3 px-4 py-4">
+        <div className="mx-auto flex max-w-[1300px] flex-wrap items-center justify-between gap-3 px-4 py-4">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-foreground">{TITLE}</h1>
             <p className="text-xs text-muted-foreground">
@@ -173,8 +203,8 @@ function GruposCaminhaoPage() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-[1000px] space-y-4 px-4 py-6">
-        <div className="flex gap-2">
+      <div className="mx-auto max-w-[1300px] space-y-4 px-4 py-6">
+        <div className="flex flex-wrap items-center gap-2">
           {STATUS.map((s) => {
             const count = rows.filter((r) => r.status === s.id).length;
             const active = filtro === s.id;
@@ -182,7 +212,10 @@ function GruposCaminhaoPage() {
               <button
                 key={s.id}
                 type="button"
-                onClick={() => setFiltro(s.id)}
+                onClick={() => {
+                  setFiltro(s.id);
+                  setSelecionados([]);
+                }}
                 className={
                   active
                     ? "rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
@@ -193,6 +226,48 @@ function GruposCaminhaoPage() {
               </button>
             );
           })}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card p-3">
+          <span className="text-xs text-muted-foreground">
+            {selectedRows.length} selecionado(s)
+          </span>
+          <button
+            type="button"
+            onClick={() => void copiarSelecionados()}
+            disabled={selectedRows.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            <Copy className="size-3.5" />
+            Copiar links
+          </button>
+          <button
+            type="button"
+            onClick={abrirSelecionados}
+            disabled={selectedRows.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            <ExternalLink className="size-3.5" />
+            Acessar links
+          </button>
+          <button
+            type="button"
+            onClick={() => void Promise.all(selectedRows.map((r) => setStatus(r, "entrei")))}
+            disabled={selectedRows.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            <Check className="size-3.5" />
+            Marcar entrei
+          </button>
+          <button
+            type="button"
+            onClick={() => void Promise.all(selectedRows.map((r) => setStatus(r, "ignorado")))}
+            disabled={selectedRows.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-50"
+          >
+            <X className="size-3.5" />
+            Ignorar
+          </button>
         </div>
 
         {isError ? (
@@ -209,102 +284,108 @@ function GruposCaminhaoPage() {
             Nenhum link nesta aba ainda.
           </p>
         ) : (
-          <ul className="space-y-2">
-            {visible.map((row) => (
-              <li key={row.id} className="rounded-lg border border-border bg-card p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0 space-y-1">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {row.group_name ?? "Grupo sem nome consultado"}
-                    </p>
-                    {row.group_jid || row.participants_count !== null ? (
-                      <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {row.participants_count !== null ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Users className="size-3" />
-                            {row.participants_count}
+          <div className="overflow-x-auto rounded-lg border border-border bg-card">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-border bg-muted/50 text-muted-foreground">
+                <tr>
+                  <th className="w-10 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Selecionar todos"
+                      checked={todosSelecionados}
+                      onChange={toggleTodos}
+                      className="size-3.5 accent-primary"
+                    />
+                  </th>
+                  <th className="px-3 py-2 font-medium">Nome do grupo</th>
+                  <th className="px-3 py-2 font-medium">ID do grupo</th>
+                  <th className="px-3 py-2 font-medium">Pessoas</th>
+                  <th className="px-3 py-2 font-medium">Descrição</th>
+                  <th className="px-3 py-2 font-medium">Link</th>
+                  <th className="px-3 py-2 font-medium">Já estou?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((row) => {
+                  const jaEstou = row.group_jid ? meus.has(row.group_jid) : false;
+                  return (
+                    <tr key={row.id} className="border-b border-border/60 last:border-0 align-top">
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          aria-label={`Selecionar ${row.group_name ?? row.invite_code}`}
+                          checked={selecionados.includes(row.id)}
+                          onChange={() => toggleRow(row.id)}
+                          className="size-3.5 accent-primary"
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-foreground">
+                          {row.group_name ?? "—"}
+                        </span>
+                        {row.hits > 1 ? (
+                          <span className="ml-1 text-muted-foreground">· visto {row.hits}x</span>
+                        ) : null}
+                        {row.info_error ? (
+                          <span className="block text-destructive">{row.info_error}</span>
+                        ) : null}
+                      </td>
+                      <td className="max-w-[210px] truncate px-3 py-2 font-mono text-muted-foreground">
+                        {row.group_jid ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-foreground">
+                        {row.participants_count ?? "—"}
+                      </td>
+                      <td className="max-w-[280px] px-3 py-2 text-muted-foreground">
+                        <span className="line-clamp-2">{row.group_description ?? "—"}</span>
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="max-w-[190px] truncate font-mono text-muted-foreground">
+                            {row.invite_url}
                           </span>
-                        ) : null}
-                        {row.group_jid ? (
-                          <span className="font-mono">{row.group_jid}</span>
-                        ) : null}
-                      </p>
-                    ) : null}
-                    {row.group_description ? (
-                      <p className="line-clamp-2 text-xs text-muted-foreground/80">
-                        {row.group_description}
-                      </p>
-                    ) : null}
-                    <p className="truncate font-mono text-xs text-muted-foreground">{row.invite_url}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {row.source_group_name ?? row.source_chat_id ?? "origem desconhecida"}
-                      {row.sender ? ` · ${row.sender}` : ""}
-                      {row.hits > 1 ? ` · visto ${row.hits}x` : ""}
-                    </p>
-                    {row.message_text ? (
-                      <p className="line-clamp-2 text-xs text-muted-foreground/80">
-                        {row.message_text}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => void copy(row.invite_url)}
-                      title="Copiar link"
-                      className="rounded-md border border-input p-2 text-foreground hover:bg-accent"
-                    >
-                      <Copy className="size-3.5" />
-                    </button>
-                    <a
-                      href={row.invite_url}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      title="Abrir convite"
-                      className="rounded-md border border-input p-2 text-foreground hover:bg-accent"
-                    >
-                      <ExternalLink className="size-3.5" />
-                    </a>
-                    {row.status !== "entrei" ? (
-                      <button
-                        type="button"
-                        onClick={() => void setStatus(row, "entrei")}
-                        title="Marcar como entrei"
-                        className="rounded-md border border-input p-2 text-foreground hover:bg-accent"
-                      >
-                        <Check className="size-3.5" />
-                      </button>
-                    ) : null}
-                    {row.status !== "ignorado" ? (
-                      <button
-                        type="button"
-                        onClick={() => void setStatus(row, "ignorado")}
-                        title="Ignorar"
-                        className="rounded-md border border-input p-2 text-foreground hover:bg-accent"
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => void remove(row)}
-                      title="Remover"
-                      className="rounded-md border border-input p-2 text-destructive hover:bg-accent"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                          <button
+                            type="button"
+                            onClick={() => void copy(row.invite_url)}
+                            title="Copiar link"
+                            className="rounded-md border border-input p-1 text-foreground hover:bg-accent"
+                          >
+                            <Copy className="size-3" />
+                          </button>
+                          <a
+                            href={row.invite_url}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            title="Abrir convite"
+                            className="rounded-md border border-input p-1 text-foreground hover:bg-accent"
+                          >
+                            <ExternalLink className="size-3" />
+                          </a>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2">
+                        {jaEstou ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-medium text-primary">
+                            <Check className="size-3" />
+                            Já estou
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {row.group_jid ? "Não" : "—"}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
 
         <section className="rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground">
           <h2 className="mb-2 text-sm font-semibold text-foreground">Como ligar o n8n</h2>
-          <p>
-            No fim do seu fluxo que escuta as mensagens, adicione um nó HTTP Request:
-          </p>
+          <p>No fim do seu fluxo que escuta as mensagens, adicione um nó HTTP Request:</p>
           <pre className="mt-2 overflow-x-auto rounded-md bg-muted p-3 font-mono text-[11px] text-foreground">
 {`POST https://group-card-stream.lovable.app/api/public/hooks/mensagem
 Headers:
