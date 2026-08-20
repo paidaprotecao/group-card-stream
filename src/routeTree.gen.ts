@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DisparoRouteImport } from './routes/disparo'
+import { Route as GruposCaminhaoRouteImport } from './routes/grupos-caminhao'
 import { Route as IntegracaoRouteImport } from './routes/integracao'
 import { Route as ApiPublicHooksLimparChatsRouteImport } from './routes/api/public/hooks/limpar-chats'
 import { Route as ApiPublicHooksMensagemRouteImport } from './routes/api/public/hooks/mensagem'
@@ -23,6 +24,11 @@ const IndexRoute = IndexRouteImport.update({
 const DisparoRoute = DisparoRouteImport.update({
   id: '/disparo',
   path: '/disparo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GruposCaminhaoRoute = GruposCaminhaoRouteImport.update({
+  id: '/grupos-caminhao',
+  path: '/grupos-caminhao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegracaoRoute = IntegracaoRouteImport.update({
@@ -45,6 +51,7 @@ const ApiPublicHooksMensagemRoute = ApiPublicHooksMensagemRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
   '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
   '/api/public/hooks/mensagem': typeof ApiPublicHooksMensagemRoute
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
   '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
   '/api/public/hooks/mensagem': typeof ApiPublicHooksMensagemRoute
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
   '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
   '/api/public/hooks/mensagem': typeof ApiPublicHooksMensagemRoute
@@ -69,6 +78,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/disparo'
+    | '/grupos-caminhao'
     | '/integracao'
     | '/api/public/hooks/limpar-chats'
     | '/api/public/hooks/mensagem'
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/disparo'
+    | '/grupos-caminhao'
     | '/integracao'
     | '/api/public/hooks/limpar-chats'
     | '/api/public/hooks/mensagem'
@@ -83,6 +94,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/disparo'
+    | '/grupos-caminhao'
     | '/integracao'
     | '/api/public/hooks/limpar-chats'
     | '/api/public/hooks/mensagem'
@@ -91,6 +103,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DisparoRoute: typeof DisparoRoute
+  GruposCaminhaoRoute: typeof GruposCaminhaoRoute
   IntegracaoRoute: typeof IntegracaoRoute
   ApiPublicHooksLimparChatsRoute: typeof ApiPublicHooksLimparChatsRoute
   ApiPublicHooksMensagemRoute: typeof ApiPublicHooksMensagemRoute
@@ -110,6 +123,13 @@ declare module '@tanstack/react-router' {
       path: '/disparo'
       fullPath: '/disparo'
       preLoaderRoute: typeof DisparoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/grupos-caminhao': {
+      id: '/grupos-caminhao'
+      path: '/grupos-caminhao'
+      fullPath: '/grupos-caminhao'
+      preLoaderRoute: typeof GruposCaminhaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integracao': {
@@ -139,6 +159,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DisparoRoute: DisparoRoute,
+  GruposCaminhaoRoute: GruposCaminhaoRoute,
   IntegracaoRoute: IntegracaoRoute,
   ApiPublicHooksLimparChatsRoute: ApiPublicHooksLimparChatsRoute,
   ApiPublicHooksMensagemRoute: ApiPublicHooksMensagemRoute,

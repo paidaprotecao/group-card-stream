@@ -193,6 +193,13 @@ function KanbanPage() {
               Disparo avulso
             </Link>
             <Link
+              to="/grupos-caminhao"
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <Truck className="size-3.5" />
+              Grupos de caminhão
+            </Link>
+            <Link
               to="/integracao"
               className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent"
             >
