@@ -26,6 +26,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function valueAsString(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   const record = asRecord(value);
   if (!record) return null;
 
@@ -42,13 +43,17 @@ function valueAsString(value: unknown): string | null {
 }
 
 const GROUP_JID_RE = /\d[\d-]{5,}@g\.us/i;
+const BARE_GROUP_ID_RE = /^(?:120363\d{8,}|\d{8,}-\d{5,})$/;
 const SENDER_JID_RE = /\d[\d:-]{5,}@(s\.whatsapp\.net|c\.us|lid)/i;
 
 function normalizeJid(value: string | null, suffix: "group" | "sender"): string | null {
   if (!value) return null;
   const pattern = suffix === "group" ? GROUP_JID_RE : SENDER_JID_RE;
-  const match = value.match(pattern);
-  return match?.[0] ?? value.trim();
+  const trimmed = value.trim();
+  const match = trimmed.match(pattern);
+  if (match?.[0]) return match[0];
+  if (suffix === "group" && BARE_GROUP_ID_RE.test(trimmed)) return `${trimmed}@g.us`;
+  return trimmed;
 }
 
 function findStringDeep(
@@ -106,7 +111,8 @@ function findAnyStringDeep(value: unknown, valueMatches: (value: string) => bool
 }
 
 function isGroupJid(value: string): boolean {
-  return GROUP_JID_RE.test(value);
+  const normalized = normalizeJid(value, "group");
+  return Boolean(normalized && GROUP_JID_RE.test(normalized));
 }
 
 function isSenderJid(value: string): boolean {
@@ -212,6 +218,28 @@ export function temOrigemDeGrupo(payload: unknown): boolean {
       "body.message.chatid",
       "body.message.chatId",
       "body.message.chat_id",
+      "data.chatid",
+      "data.chatId",
+      "data.ChatID",
+      "data.chat.wa_chatid",
+      "data.message.chatid",
+      "data.message.chatId",
+      "data.message.chat_id",
+      "data.Message.chatid",
+      "data.Message.chatId",
+      "data.groupJid",
+      "data.group_id",
+      "data.remoteJid",
+      "data.message.remoteJid",
+      "data.key.remoteJid",
+      "data.message.key.remoteJid",
+      "data.Message.key.remoteJid",
+      "data.Data.key.remoteJid",
+      "data.Data.Key.remoteJid",
+      "data.Data.Key.RemoteJid",
+      "data.Data.Info.Chat",
+      "data.Data.Info.MessageSource.Chat",
+      "data.Data.Info.Source.Chat",
       "groupJid",
       "group_id",
       "remoteJid",
@@ -271,6 +299,7 @@ function unwrapMensagemPayload(payload: unknown): unknown {
     const parsed = parseJsonString(data);
     if (parsed) return unwrapMensagemPayload(parsed);
   }
+  if (asRecord(data)) return unwrapMensagemPayload(data);
 
   const body = record["body"];
   if (typeof body === "string") {
@@ -577,6 +606,21 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "body.senderPhone",
     "body.phone",
     "body.number",
+    "data.sender_pn",
+    "data.message.sender_pn",
+    "data.senderPhone",
+    "data.phone",
+    "data.number",
+    "data.Data.Info.Sender.User",
+    "data.Data.Info.MessageSource.Sender.User",
+    "data.Data.Info.Source.Sender.User",
+    "data.Data.Key.participant",
+    "data.Data.Key.Participant",
+    "data.participant",
+    "data.key.participant",
+    "data.message.key.participant",
+    "data.from",
+    "data.message.from",
   ]);
   const senderNome = pickStr(payload, [
     "senderName",
@@ -593,6 +637,15 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "Data.Info.PushName",
     "Data.Info.SenderName",
     "Data.Info.ParticipantName",
+    "data.senderName",
+    "data.message.senderName",
+    "data.pushName",
+    "data.message.pushName",
+    "data.notifyName",
+    "data.Data.PushName",
+    "data.Data.Info.PushName",
+    "data.Data.Info.SenderName",
+    "data.Data.Info.ParticipantName",
   ]);
 
   return {
@@ -617,6 +670,28 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
       "body.message.chatid",
       "body.message.chatId",
       "body.message.chat_id",
+      "data.chatid",
+      "data.chatId",
+      "data.ChatID",
+      "data.chat.wa_chatid",
+      "data.message.chatid",
+      "data.message.chatId",
+      "data.message.chat_id",
+      "data.Message.chatid",
+      "data.Message.chatId",
+      "data.groupJid",
+      "data.group_id",
+      "data.remoteJid",
+      "data.message.remoteJid",
+      "data.key.remoteJid",
+      "data.message.key.remoteJid",
+      "data.Message.key.remoteJid",
+      "data.Data.key.remoteJid",
+      "data.Data.Key.remoteJid",
+      "data.Data.Key.RemoteJid",
+      "data.Data.Info.Chat",
+      "data.Data.Info.MessageSource.Chat",
+      "data.Data.Info.Source.Chat",
       "groupJid",
       "group_id",
       "remoteJid",
@@ -648,6 +723,14 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
       "body.group_name",
       "body.message.groupName",
       "body.message.group_name",
+      "data.chatName",
+      "data.chat.name",
+      "data.chat.wa_name",
+      "data.message.chatName",
+      "data.groupName",
+      "data.group_name",
+      "data.message.groupName",
+      "data.message.group_name",
       "grupo",
     ]),
     tipo,
