@@ -503,6 +503,9 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
       .from("fila_lotes")
       .insert({
         sender: msg.sender,
+        sender_phone: msg.senderPhone,
+        sender_name: msg.senderName,
+
         source_chat_id: msg.sourceChatId,
         source_group_name: msg.sourceGroupName,
         categoria_origem: categoriaOrigem,
