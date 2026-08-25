@@ -409,5 +409,5 @@ export async function processarFila(maxLotes = 1) {
     detalhes.push({ lote_id: lote.id, enviados, falhas });
   }
 
-  return { ok: true as const, processados, grupos: grupos.length, detalhes };
+  return { ok: true as const, processados, grupos: grupos?.length ?? 0, detalhes };
 }
