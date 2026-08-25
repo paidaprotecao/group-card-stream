@@ -7,6 +7,7 @@ import { ArrowLeft, ListOrdered, Play, RefreshCw, RotateCcw, X, Zap } from "luci
 
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RotasPostagem } from "@/components/RotasPostagem";
 import {
   JANELA_SEGUNDOS,
   STATUS_LABEL,
