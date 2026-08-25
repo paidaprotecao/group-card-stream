@@ -63,6 +63,7 @@ export type Database = {
       }
       fila_lotes: {
         Row: {
+          categoria_origem: string | null
           created_at: string
           enviados: number
           erro: string | null
@@ -78,6 +79,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          categoria_origem?: string | null
           created_at?: string
           enviados?: number
           erro?: string | null
@@ -93,6 +95,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          categoria_origem?: string | null
           created_at?: string
           enviados?: number
           erro?: string | null
@@ -169,6 +172,36 @@ export type Database = {
           source_chat_id?: string | null
           source_group_name?: string | null
           status?: string
+        }
+        Relationships: []
+      }
+      rotas_postagem: {
+        Row: {
+          ativo: boolean
+          categoria_origem: string
+          created_at: string
+          destino_chat_id: string
+          destino_nome: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean
+          categoria_origem: string
+          created_at?: string
+          destino_chat_id: string
+          destino_nome?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean
+          categoria_origem?: string
+          created_at?: string
+          destino_chat_id?: string
+          destino_nome?: string | null
+          id?: string
+          updated_at?: string
         }
         Relationships: []
       }

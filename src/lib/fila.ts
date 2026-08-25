@@ -5,6 +5,7 @@ export type FilaLote = {
   sender: string | null;
   source_chat_id: string | null;
   source_group_name: string | null;
+  categoria_origem: string | null;
   status: string;
   fecha_em: string;
   itens_count: number;
@@ -12,6 +13,16 @@ export type FilaLote = {
   falhas: number;
   erro: string | null;
   sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RotaPostagem = {
+  id: string;
+  categoria_origem: string;
+  destino_chat_id: string;
+  destino_nome: string | null;
+  ativo: boolean;
   created_at: string;
   updated_at: string;
 };

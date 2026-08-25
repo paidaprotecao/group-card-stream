@@ -7,6 +7,7 @@ import { ArrowLeft, ListOrdered, Play, RefreshCw, RotateCcw, X, Zap } from "luci
 
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RotasPostagem } from "@/components/RotasPostagem";
 import {
   JANELA_SEGUNDOS,
   STATUS_LABEL,
@@ -184,6 +185,8 @@ function FilaPage() {
       </header>
 
       <div className="mx-auto max-w-[1200px] space-y-3 px-4 py-6">
+        <RotasPostagem />
+
         {isError ? (
           <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-foreground">
             Erro ao carregar a fila: {(error as Error).message}
