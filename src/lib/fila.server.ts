@@ -393,17 +393,8 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const novoLote = !loteId;
 
   if (!loteId) {
-    // Descobre a categoria do grupo de origem (define para onde o pacote vai).
-    let categoriaOrigem: string | null = null;
-    if (msg.sourceChatId) {
-      const { data: origem } = await supabaseAdmin
-        .from("wa_groups")
-        .select("categoria, group_name")
-        .eq("chat_id", msg.sourceChatId)
-        .maybeSingle();
-      categoriaOrigem = origem?.categoria ?? null;
-      if (!msg.sourceGroupName && origem?.group_name) msg.sourceGroupName = origem.group_name;
-    }
+    const categoriaOrigem = triagem.categoria;
+
 
     const { data: criado, error } = await supabaseAdmin
       .from("fila_lotes")
