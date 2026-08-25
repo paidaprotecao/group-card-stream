@@ -26,6 +26,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function valueAsString(value: unknown): string | null {
   if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
   const record = asRecord(value);
   if (!record) return null;
 
@@ -42,13 +43,17 @@ function valueAsString(value: unknown): string | null {
 }
 
 const GROUP_JID_RE = /\d[\d-]{5,}@g\.us/i;
+const BARE_GROUP_ID_RE = /^(?:120363\d{8,}|\d{8,}-\d{5,})$/;
 const SENDER_JID_RE = /\d[\d:-]{5,}@(s\.whatsapp\.net|c\.us|lid)/i;
 
 function normalizeJid(value: string | null, suffix: "group" | "sender"): string | null {
   if (!value) return null;
   const pattern = suffix === "group" ? GROUP_JID_RE : SENDER_JID_RE;
-  const match = value.match(pattern);
-  return match?.[0] ?? value.trim();
+  const trimmed = value.trim();
+  const match = trimmed.match(pattern);
+  if (match?.[0]) return match[0];
+  if (suffix === "group" && BARE_GROUP_ID_RE.test(trimmed)) return `${trimmed}@g.us`;
+  return trimmed;
 }
 
 function findStringDeep(
@@ -106,7 +111,8 @@ function findAnyStringDeep(value: unknown, valueMatches: (value: string) => bool
 }
 
 function isGroupJid(value: string): boolean {
-  return GROUP_JID_RE.test(value);
+  const normalized = normalizeJid(value, "group");
+  return Boolean(normalized && GROUP_JID_RE.test(normalized));
 }
 
 function isSenderJid(value: string): boolean {
