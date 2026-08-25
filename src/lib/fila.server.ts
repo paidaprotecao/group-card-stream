@@ -17,6 +17,12 @@ function pickStr(payload: unknown, paths: string[]): string | null {
   return null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
 const MEDIA_KIND: Array<[RegExp, string]> = [
   [/image|photo|figur/i, "image"],
   [/video/i, "video"],
@@ -37,11 +43,129 @@ function detectarTipo(payload: unknown): string {
       "message.mimetype",
     ]) ?? "";
   for (const [re, tipo] of MEDIA_KIND) if (re.test(raw)) return tipo;
+
+  const hint = detectarTipoPorChaves(payload);
+  if (hint) return hint;
   return "text";
+}
+
+function detectarTipoPorChaves(payload: unknown, depth = 0): string | null {
+  if (depth > 5) return null;
+  const obj = asRecord(payload);
+  if (!obj) return null;
+
+  for (const [key, value] of Object.entries(obj)) {
+    const normalized = key.toLowerCase();
+    if (normalized.includes("imagemessage") || normalized.includes("photomessage")) return "image";
+    if (normalized.includes("videomessage")) return "video";
+    if (normalized.includes("audiomessage") || normalized.includes("pttmessage")) return "audio";
+    if (normalized.includes("documentmessage") || normalized.includes("stickermessage")) return "document";
+    if (typeof value === "string") {
+      for (const [re, tipo] of MEDIA_KIND) if (re.test(value)) return tipo;
+    }
+  }
+
+  for (const value of Object.values(obj)) {
+    const nested = detectarTipoPorChaves(value, depth + 1);
+    if (nested) return nested;
+  }
+  return null;
 }
 
 function isUrl(value: string | null): boolean {
   return Boolean(value && /^(https?:\/\/|data:)/i.test(value));
+}
+
+function isProvavelBase64(value: string | null): boolean {
+  return Boolean(value && value.length > 120 && /^[A-Za-z0-9+/]+={0,2}$/.test(value));
+}
+
+function payloadParaDownload(payload: unknown): unknown {
+  return get(payload, "message") ?? get(payload, "body.message") ?? payload;
+}
+
+function pickMediaBaixada(payload: unknown): string | null {
+  const value = pickStr(payload, [
+    "file",
+    "File",
+    "fileURL",
+    "fileUrl",
+    "url",
+    "URL",
+    "mediaUrl",
+    "downloadUrl",
+    "base64",
+    "data",
+    "Data",
+    "result.file",
+    "result.fileURL",
+    "result.fileUrl",
+    "result.url",
+    "result.mediaUrl",
+    "result.downloadUrl",
+    "result.base64",
+    "result.data",
+    "data.file",
+    "data.fileURL",
+    "data.fileUrl",
+    "data.url",
+    "data.mediaUrl",
+    "data.downloadUrl",
+    "data.base64",
+    "Data.file",
+    "Data.fileURL",
+    "Data.fileUrl",
+    "Data.url",
+    "Data.mediaUrl",
+    "Data.downloadUrl",
+    "Data.base64",
+  ]);
+  if (!value) return null;
+  return isUrl(value) || isProvavelBase64(value) ? value : null;
+}
+
+async function baixarMidiaDaMensagem(
+  payload: unknown,
+): Promise<{ ok: true; mediaUrl: string; tipo: string | null; docName: string | null } | { ok: false; error: string }> {
+  const baseUrl = (process.env["UAZAPI_URL"] ?? "").replace(/\/+$/, "");
+  const token = process.env["UAZAPI_TOKEN"];
+  if (!baseUrl || !token) {
+    return { ok: false, error: "Credenciais da uazapi não configuradas para baixar mídia" };
+  }
+
+  try {
+    const res = await fetch(`${baseUrl}/message/download`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", token },
+      body: JSON.stringify(payloadParaDownload(payload)),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { ok: false, error: `Erro ao baixar mídia: HTTP ${res.status}: ${detail.slice(0, 180)}` };
+    }
+
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.toLowerCase().includes("json")) {
+      const bytes = Buffer.from(await res.arrayBuffer());
+      if (bytes.length === 0) return { ok: false, error: "Baixar mídia retornou arquivo vazio" };
+      const mime = contentType || "application/octet-stream";
+      return {
+        ok: true,
+        mediaUrl: `data:${mime};base64,${bytes.toString("base64")}`,
+        tipo: detectarTipo({ mimetype: mime }),
+        docName: null,
+      };
+    }
+
+    const data: unknown = await res.json();
+    const mediaUrl = pickMediaBaixada(data);
+    if (!mediaUrl) return { ok: false, error: "Baixar mídia não retornou arquivo utilizável" };
+    const tipo = detectarTipo(data);
+    const docName = pickStr(data, ["docName", "fileName", "filename", "name", "data.docName", "data.fileName", "Data.FileName"]);
+    return { ok: true, mediaUrl, tipo: tipo === "text" ? null : tipo, docName };
+  } catch {
+    return { ok: false, error: "Falha de rede ao baixar mídia na uazapi" };
+  }
 }
 
 export type MensagemNormalizada = {
@@ -87,7 +211,7 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     if (content && !isUrl(content)) text = content;
   }
 
-  const tipo = mediaUrl ? (tipoDetectado === "text" ? "image" : tipoDetectado) : "text";
+  const tipo = mediaUrl ? (tipoDetectado === "text" ? "image" : tipoDetectado) : tipoDetectado;
 
   return {
     sender:
@@ -133,6 +257,13 @@ export type EnfileirarResult = {
 /** Guarda a mensagem no pacote aberto do mesmo remetente/grupo (ou cria um novo). */
 export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarResult | { ok: false; error: string }> {
   const msg = normalizarMensagem(payload);
+  if (!msg.mediaUrl && msg.tipo !== "text") {
+    const baixada = await baixarMidiaDaMensagem(payload);
+    if (!baixada.ok) return { ok: false, error: baixada.error };
+    msg.mediaUrl = baixada.mediaUrl;
+    msg.tipo = baixada.tipo ?? msg.tipo;
+    msg.docName = msg.docName ?? baixada.docName;
+  }
   if (!msg.text && !msg.mediaUrl) {
     return { ok: false, error: "Mensagem sem texto nem mídia" };
   }
