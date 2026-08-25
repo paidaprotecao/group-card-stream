@@ -29,10 +29,15 @@ export const Route = createFileRoute("/api/public/hooks/frete")({
           if (!result.ok) {
             return Response.json({ success: false, error: result.error }, { status: 422 });
           }
+          if (result.ignorado) {
+            console.log(`[fila] ignorado · ${result.motivo} · categoria=${result.categoria_origem}`);
+            return Response.json({ success: true, ...result });
+          }
           console.log(
             `[fila] lote ${result.lote_id} · itens ${result.itens} · novo=${result.novo_lote} · dup=${result.duplicado}`,
           );
           return Response.json({ success: true, ...result });
+
         } catch (err) {
           console.error("[fila] falhou:", err);
           return Response.json(

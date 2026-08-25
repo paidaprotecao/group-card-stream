@@ -248,15 +248,107 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
 
 export type EnfileirarResult = {
   ok: true;
-  lote_id: string;
+  lote_id: string | null;
   novo_lote: boolean;
   duplicado: boolean;
   itens: number;
+  ignorado?: boolean;
+  motivo?: string | undefined;
+  categoria_origem?: string | null;
+
 };
+
+/** Triagem: só entra na fila quem vem de grupo com rota ativa (ex: frete_fechado, venda_fechado). */
+async function triarOrigem(
+  supabaseAdmin: any,
+  sourceChatId: string | null,
+  sourceGroupName: string | null,
+): Promise<{ permitido: boolean; categoria: string | null; groupName: string | null; motivo?: string }> {
+  if (!sourceChatId) {
+    return { permitido: false, categoria: null, groupName: null, motivo: "Sem grupo de origem" };
+  }
+
+  const { data: origem } = await supabaseAdmin
+    .from("wa_groups")
+    .select("categoria, group_name, ativo")
+    .eq("chat_id", sourceChatId)
+    .maybeSingle();
+
+  // Grupo desconhecido: cadastra como "indefinido" para aparecer no Kanban, mas não posta.
+  if (!origem) {
+    await supabaseAdmin
+      .from("wa_groups")
+      .upsert(
+        {
+          chat_id: sourceChatId,
+          group_name: sourceGroupName,
+          categoria: "indefinido",
+          ativo: true,
+          last_seen_at: new Date().toISOString(),
+        },
+        { onConflict: "chat_id" },
+      );
+    return {
+      permitido: false,
+      categoria: "indefinido",
+      groupName: sourceGroupName,
+      motivo: "Grupo novo cadastrado como indefinido (sem rota)",
+    };
+  }
+
+  await supabaseAdmin
+    .from("wa_groups")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("chat_id", sourceChatId);
+
+  const categoria = origem.categoria ?? null;
+  const groupName = origem.group_name ?? sourceGroupName;
+
+  if (origem.ativo === false) {
+    return { permitido: false, categoria, groupName, motivo: "Grupo inativo" };
+  }
+
+  const { data: rotas } = await supabaseAdmin
+    .from("rotas_postagem")
+    .select("id")
+    .eq("ativo", true)
+    .eq("categoria_origem", categoria ?? "")
+    .limit(1);
+
+  if (!rotas || rotas.length === 0) {
+    return {
+      permitido: false,
+      categoria,
+      groupName,
+      motivo: `Categoria "${categoria ?? "indefinido"}" sem rota de postagem ativa`,
+    };
+  }
+
+  return { permitido: true, categoria, groupName };
+}
 
 /** Guarda a mensagem no pacote aberto do mesmo remetente/grupo (ou cria um novo). */
 export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarResult | { ok: false; error: string }> {
   const msg = normalizarMensagem(payload);
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+  // 1) Triagem ANTES de baixar mídia: evita trabalho e flood de grupos que não repostam.
+  const triagem = await triarOrigem(supabaseAdmin, msg.sourceChatId, msg.sourceGroupName);
+  if (!triagem.permitido) {
+    return {
+      ok: true,
+      lote_id: null,
+      novo_lote: false,
+      duplicado: false,
+      itens: 0,
+      ignorado: true,
+      motivo: triagem.motivo,
+      categoria_origem: triagem.categoria,
+    };
+  }
+  if (triagem.groupName) msg.sourceGroupName = triagem.groupName;
+
   if (!msg.mediaUrl && msg.tipo !== "text") {
     const baixada = await baixarMidiaDaMensagem(payload);
     if (!baixada.ok) return { ok: false, error: baixada.error };
@@ -268,7 +360,6 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
     return { ok: false, error: "Mensagem sem texto nem mídia" };
   }
 
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
   if (msg.externalId) {
     const { data: dup } = await supabaseAdmin
@@ -303,17 +394,8 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const novoLote = !loteId;
 
   if (!loteId) {
-    // Descobre a categoria do grupo de origem (define para onde o pacote vai).
-    let categoriaOrigem: string | null = null;
-    if (msg.sourceChatId) {
-      const { data: origem } = await supabaseAdmin
-        .from("wa_groups")
-        .select("categoria, group_name")
-        .eq("chat_id", msg.sourceChatId)
-        .maybeSingle();
-      categoriaOrigem = origem?.categoria ?? null;
-      if (!msg.sourceGroupName && origem?.group_name) msg.sourceGroupName = origem.group_name;
-    }
+    const categoriaOrigem = triagem.categoria;
+
 
     const { data: criado, error } = await supabaseAdmin
       .from("fila_lotes")
@@ -486,8 +568,9 @@ export async function processarFila(maxLotes = 1) {
       }
     }
 
-    const destinos: Grupo[] =
-      (categoria ? rotaPorCategoria.get(categoria) : undefined) ?? (grupos ?? []);
+    // Só posta no destino da rota da categoria de origem (sem fallback "posta em tudo").
+    const destinos: Grupo[] = (categoria ? rotaPorCategoria.get(categoria) : undefined) ?? [];
+
 
     if (destinos.length === 0) {
       await supabaseAdmin
