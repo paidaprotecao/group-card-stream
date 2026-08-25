@@ -201,6 +201,8 @@ async function baixarMidiaDaMensagem(
 
 export type MensagemNormalizada = {
   sender: string | null;
+  senderPhone: string | null;
+  senderName: string | null;
   sourceChatId: string | null;
   sourceGroupName: string | null;
   tipo: string;
@@ -209,6 +211,15 @@ export type MensagemNormalizada = {
   docName: string | null;
   externalId: string | null;
 };
+
+/** Extrai só os dígitos de um JID/telefone (ex: "5511999@s.whatsapp.net" -> "5511999"). */
+function extrairTelefone(value: string | null): string | null {
+  if (!value) return null;
+  const base = value.split("@")[0] ?? value;
+  const digits = base.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}
+
 
 export function normalizarMensagem(payload: unknown): MensagemNormalizada {
   const normalizado = unwrapMensagemPayload(payload);
@@ -264,24 +275,39 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
 
   const tipo = mediaUrl ? (tipoDetectado === "text" ? "image" : tipoDetectado) : tipoDetectado;
 
+  const senderJid = pickStr(payload, [
+    "sender",
+    "message.sender",
+    "body.sender",
+    "body.message.sender",
+    "participant",
+    "body.participant",
+    "body.message.participant",
+    "key.participant",
+    "message.key.participant",
+    "senderJid",
+    "from",
+    "body.from",
+    "body.message.from",
+  ]);
+  const senderNome = pickStr(payload, [
+    "senderName",
+    "message.senderName",
+    "body.senderName",
+    "body.message.senderName",
+    "pushName",
+    "message.pushName",
+    "body.pushName",
+    "body.message.pushName",
+    "notifyName",
+    "message.notifyName",
+  ]);
+
   return {
-    sender:
-      pickStr(payload, [
-        "sender",
-        "message.sender",
-        "body.sender",
-        "body.message.sender",
-        "senderName",
-        "message.senderName",
-        "body.senderName",
-        "body.message.senderName",
-        "participant",
-        "body.participant",
-        "body.message.participant",
-        "from",
-        "body.from",
-        "body.message.from",
-      ]) ?? null,
+    sender: senderNome ?? senderJid ?? null,
+    senderPhone: extrairTelefone(senderJid),
+    senderName: senderNome,
+
     sourceChatId: pickStr(normalizado, [
       "chatid",
       "chatId",
@@ -477,6 +503,9 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
       .from("fila_lotes")
       .insert({
         sender: msg.sender,
+        sender_phone: msg.senderPhone,
+        sender_name: msg.senderName,
+
         source_chat_id: msg.sourceChatId,
         source_group_name: msg.sourceGroupName,
         categoria_origem: categoriaOrigem,
@@ -505,14 +534,77 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const itens = ordem + 1;
   const { error: updErr } = await supabaseAdmin
     .from("fila_lotes")
-    .update({ itens_count: itens, fecha_em: fechaEm })
+    .update({
+      itens_count: itens,
+      fecha_em: fechaEm,
+      ...(msg.senderPhone ? { sender_phone: msg.senderPhone } : {}),
+      ...(msg.senderName ? { sender_name: msg.senderName } : {}),
+    })
+
     .eq("id", loteId);
   if (updErr) return { ok: false, error: updErr.message };
 
   return { ok: true, lote_id: loteId, novo_lote: novoLote, duplicado: false, itens };
 }
 
-type Grupo = { chat_id: string; group_name: string | null };
+type Grupo = {
+  chat_id: string;
+  group_name: string | null;
+  cabecalho?: string | null;
+  enviar_contato?: boolean;
+};
+
+/** Envia um texto simples (usado no cabeçalho de cada frete/caminhão). */
+async function enviarTexto(
+  baseUrl: string,
+  token: string,
+  chatId: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${baseUrl}/send/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", token },
+      body: JSON.stringify({ number: chatId, text }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { ok: false, error: `HTTP ${res.status}: ${detail.slice(0, 160)}` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Falha de rede ao enviar cabeçalho" };
+  }
+}
+
+/** Envia o contato (vCard) de quem originou a mensagem. */
+async function enviarContato(
+  baseUrl: string,
+  token: string,
+  chatId: string,
+  phone: string,
+  fullName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${baseUrl}/send/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", token },
+      body: JSON.stringify({
+        number: chatId,
+        fullName,
+        phoneNumber: phone,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { ok: false, error: `HTTP ${res.status}: ${detail.slice(0, 160)}` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Falha de rede ao enviar contato" };
+  }
+}
+
 
 async function enviarItem(
   baseUrl: string,
@@ -590,12 +682,17 @@ export async function processarFila(maxLotes = 1) {
   // Rotas por categoria de origem (ex: frete_fechado -> Fretes br).
   const { data: rotas } = await supabaseAdmin
     .from("rotas_postagem")
-    .select("categoria_origem, destino_chat_id, destino_nome")
+    .select("categoria_origem, destino_chat_id, destino_nome, cabecalho, enviar_contato")
     .eq("ativo", true);
   const rotaPorCategoria = new Map<string, Grupo[]>();
   for (const rota of rotas ?? []) {
     const lista = rotaPorCategoria.get(rota.categoria_origem) ?? [];
-    lista.push({ chat_id: rota.destino_chat_id, group_name: rota.destino_nome });
+    lista.push({
+      chat_id: rota.destino_chat_id,
+      group_name: rota.destino_nome,
+      cabecalho: rota.cabecalho ?? null,
+      enviar_contato: rota.enviar_contato !== false,
+    });
     rotaPorCategoria.set(rota.categoria_origem, lista);
   }
 
@@ -605,7 +702,8 @@ export async function processarFila(maxLotes = 1) {
 
   const { data: lotes, error: lotesErr } = await supabaseAdmin
     .from("fila_lotes")
-    .select("id, categoria_origem, source_chat_id")
+    .select("id, categoria_origem, source_chat_id, sender, sender_name, sender_phone")
+
     .eq("status", "pronto")
     .order("created_at", { ascending: true })
     .limit(Math.max(1, Math.min(maxLotes, 5)));
@@ -671,6 +769,17 @@ export async function processarFila(maxLotes = 1) {
     let ultimoErro: string | null = null;
 
     for (const grupo of destinos) {
+      // 1) Cabeçalho separando cada frete/caminhão.
+      if (grupo.cabecalho && grupo.cabecalho.trim()) {
+        const cab = await enviarTexto(baseUrl, token, grupo.chat_id, grupo.cabecalho.trim());
+        if (!cab.ok) {
+          falhas += 1;
+          ultimoErro = cab.error ?? "erro no cabeçalho";
+        }
+        await new Promise((r) => setTimeout(r, DELAY_ENTRE_ITENS));
+      }
+
+      // 2) Mensagens encaminhadas, na ordem.
       for (const item of itens ?? []) {
         const res = await enviarItem(baseUrl, token, grupo, item);
         if (res.ok) enviados += 1;
@@ -680,8 +789,26 @@ export async function processarFila(maxLotes = 1) {
         }
         await new Promise((r) => setTimeout(r, DELAY_ENTRE_ITENS));
       }
+
+      // 3) Contato (vCard) de quem enviou.
+      if (grupo.enviar_contato !== false && lote.sender_phone) {
+        const contato = await enviarContato(
+          baseUrl,
+          token,
+          grupo.chat_id,
+          lote.sender_phone,
+          lote.sender_name ?? lote.sender ?? lote.sender_phone,
+        );
+        if (!contato.ok) {
+          falhas += 1;
+          ultimoErro = contato.error ?? "erro no contato";
+        }
+        await new Promise((r) => setTimeout(r, DELAY_ENTRE_ITENS));
+      }
+
       await new Promise((r) => setTimeout(r, DELAY_ENTRE_GRUPOS));
     }
+
 
 
     await supabaseAdmin

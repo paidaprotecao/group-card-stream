@@ -27,7 +27,9 @@ async function fetchRotas(): Promise<RotaPostagem[]> {
 export function RotasPostagem() {
   const queryClient = useQueryClient();
   const { data: rotas } = useQuery({ queryKey: ROTAS_KEY, queryFn: fetchRotas });
-  const [rascunho, setRascunho] = useState<Record<string, { chat: string; nome: string }>>({});
+  const [rascunho, setRascunho] = useState<
+    Record<string, { chat: string; nome: string; cabecalho: string }>
+  >({});
 
   useEffect(() => {
     if (!rotas) return;
@@ -38,6 +40,7 @@ export function RotasPostagem() {
           next[rota.categoria_origem] = {
             chat: rota.destino_chat_id,
             nome: rota.destino_nome ?? "",
+            cabecalho: rota.cabecalho ?? "",
           };
         }
       }
@@ -46,12 +49,19 @@ export function RotasPostagem() {
   }, [rotas]);
 
   const salvar = useMutation({
-    mutationFn: async (input: { categoria: string; chat: string; nome: string; ativo: boolean }) => {
+    mutationFn: async (input: {
+      categoria: string;
+      chat: string;
+      nome: string;
+      cabecalho: string;
+      ativo: boolean;
+    }) => {
       const { error } = await supabase.from("rotas_postagem").upsert(
         {
           categoria_origem: input.categoria,
           destino_chat_id: input.chat.trim(),
           destino_nome: input.nome.trim() || null,
+          cabecalho: input.cabecalho.trim() || null,
           ativo: input.ativo,
         },
         { onConflict: "categoria_origem" },
@@ -63,6 +73,17 @@ export function RotasPostagem() {
       void queryClient.invalidateQueries({ queryKey: ROTAS_KEY });
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Falha ao salvar rota"),
+  });
+
+  const alternarContato = useMutation({
+    mutationFn: async (input: { id: string; valor: boolean }) => {
+      const { error } = await supabase
+        .from("rotas_postagem")
+        .update({ enviar_contato: input.valor })
+        .eq("id", input.id);
+      if (error) throw error;
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ROTAS_KEY }),
   });
 
   const alternarAtivo = useMutation({
@@ -83,18 +104,18 @@ export function RotasPostagem() {
         <h2 className="text-sm font-semibold">Para onde cada origem é postada</h2>
       </header>
       <p className="mb-4 text-xs text-muted-foreground">
-        O pacote é encaminhado para o destino da categoria do grupo de origem. Sem rota definida, ele
-        vai para todos os grupos ativos de <strong>Aberto postável</strong>.
+        Cada pacote sai assim, automaticamente: cabeçalho, as mensagens encaminhadas na ordem e, por
+        último, o contato (vCard) de quem enviou. Sem rota ativa, a origem não é postada.
       </p>
 
       <div className="space-y-3">
         {ORIGENS.map((origem) => {
           const rota = rotas?.find((r) => r.categoria_origem === origem.id);
-          const draft = rascunho[origem.id] ?? { chat: "", nome: "" };
+          const draft = rascunho[origem.id] ?? { chat: "", nome: "", cabecalho: "" };
           return (
             <div
               key={origem.id}
-              className="grid gap-2 rounded-lg border border-border/60 bg-background/40 p-3 md:grid-cols-[minmax(0,150px)_minmax(0,1fr)_minmax(0,1fr)_auto_auto] md:items-center"
+              className="grid gap-2 rounded-lg border border-border/60 bg-background/40 p-3 md:grid-cols-[minmax(0,140px)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto_auto_auto] md:items-center"
             >
               <span className="text-sm font-medium">{origem.label}</span>
               <Input
@@ -112,6 +133,25 @@ export function RotasPostagem() {
                   setRascunho((p) => ({ ...p, [origem.id]: { ...draft, chat: e.target.value } }))
                 }
               />
+              <Input
+                value={draft.cabecalho}
+                placeholder="Cabeçalho antes das mensagens"
+                onChange={(e) =>
+                  setRascunho((p) => ({
+                    ...p,
+                    [origem.id]: { ...draft, cabecalho: e.target.value },
+                  }))
+                }
+              />
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={rota ? rota.enviar_contato !== false : true}
+                  disabled={!rota}
+                  onCheckedChange={(v) => rota && alternarContato.mutate({ id: rota.id, valor: v })}
+                  aria-label="Enviar contato"
+                />
+                <span className="text-xs text-muted-foreground">vCard</span>
+              </div>
               <div className="flex items-center gap-2">
                 <Switch
                   checked={rota ? rota.ativo : true}
@@ -134,6 +174,7 @@ export function RotasPostagem() {
                     categoria: origem.id,
                     chat: draft.chat,
                     nome: draft.nome,
+                    cabecalho: draft.cabecalho,
                     ativo: rota ? rota.ativo : true,
                   })
                 }

@@ -72,6 +72,8 @@ export type Database = {
           id: string
           itens_count: number
           sender: string | null
+          sender_name: string | null
+          sender_phone: string | null
           sent_at: string | null
           source_chat_id: string | null
           source_group_name: string | null
@@ -88,6 +90,8 @@ export type Database = {
           id?: string
           itens_count?: number
           sender?: string | null
+          sender_name?: string | null
+          sender_phone?: string | null
           sent_at?: string | null
           source_chat_id?: string | null
           source_group_name?: string | null
@@ -104,6 +108,8 @@ export type Database = {
           id?: string
           itens_count?: number
           sender?: string | null
+          sender_name?: string | null
+          sender_phone?: string | null
           sent_at?: string | null
           source_chat_id?: string | null
           source_group_name?: string | null
@@ -178,28 +184,34 @@ export type Database = {
       rotas_postagem: {
         Row: {
           ativo: boolean
+          cabecalho: string | null
           categoria_origem: string
           created_at: string
           destino_chat_id: string
           destino_nome: string | null
+          enviar_contato: boolean
           id: string
           updated_at: string
         }
         Insert: {
           ativo?: boolean
+          cabecalho?: string | null
           categoria_origem: string
           created_at?: string
           destino_chat_id: string
           destino_nome?: string | null
+          enviar_contato?: boolean
           id?: string
           updated_at?: string
         }
         Update: {
           ativo?: boolean
+          cabecalho?: string | null
           categoria_origem?: string
           created_at?: string
           destino_chat_id?: string
           destino_nome?: string | null
+          enviar_contato?: boolean
           id?: string
           updated_at?: string
         }
