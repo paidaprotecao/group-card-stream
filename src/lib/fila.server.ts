@@ -201,6 +201,8 @@ async function baixarMidiaDaMensagem(
 
 export type MensagemNormalizada = {
   sender: string | null;
+  senderPhone: string | null;
+  senderName: string | null;
   sourceChatId: string | null;
   sourceGroupName: string | null;
   tipo: string;
@@ -209,6 +211,15 @@ export type MensagemNormalizada = {
   docName: string | null;
   externalId: string | null;
 };
+
+/** Extrai só os dígitos de um JID/telefone (ex: "5511999@s.whatsapp.net" -> "5511999"). */
+function extrairTelefone(value: string | null): string | null {
+  if (!value) return null;
+  const base = value.split("@")[0] ?? value;
+  const digits = base.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}
+
 
 export function normalizarMensagem(payload: unknown): MensagemNormalizada {
   const normalizado = unwrapMensagemPayload(payload);
