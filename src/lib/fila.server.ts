@@ -541,7 +541,64 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   return { ok: true, lote_id: loteId, novo_lote: novoLote, duplicado: false, itens };
 }
 
-type Grupo = { chat_id: string; group_name: string | null };
+type Grupo = {
+  chat_id: string;
+  group_name: string | null;
+  cabecalho?: string | null;
+  enviar_contato?: boolean;
+};
+
+/** Envia um texto simples (usado no cabeçalho de cada frete/caminhão). */
+async function enviarTexto(
+  baseUrl: string,
+  token: string,
+  chatId: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${baseUrl}/send/text`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", token },
+      body: JSON.stringify({ number: chatId, text }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { ok: false, error: `HTTP ${res.status}: ${detail.slice(0, 160)}` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Falha de rede ao enviar cabeçalho" };
+  }
+}
+
+/** Envia o contato (vCard) de quem originou a mensagem. */
+async function enviarContato(
+  baseUrl: string,
+  token: string,
+  chatId: string,
+  phone: string,
+  fullName: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const res = await fetch(`${baseUrl}/send/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json", token },
+      body: JSON.stringify({
+        number: chatId,
+        fullName,
+        phoneNumber: phone,
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text();
+      return { ok: false, error: `HTTP ${res.status}: ${detail.slice(0, 160)}` };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Falha de rede ao enviar contato" };
+  }
+}
+
 
 async function enviarItem(
   baseUrl: string,
