@@ -11,10 +11,13 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DisparoRouteImport } from './routes/disparo'
+import { Route as FilaRouteImport } from './routes/fila'
 import { Route as GruposCaminhaoRouteImport } from './routes/grupos-caminhao'
 import { Route as IntegracaoRouteImport } from './routes/integracao'
+import { Route as ApiPublicHooksFreteRouteImport } from './routes/api/public/hooks/frete'
 import { Route as ApiPublicHooksLimparChatsRouteImport } from './routes/api/public/hooks/limpar-chats'
 import { Route as ApiPublicHooksMensagemRouteImport } from './routes/api/public/hooks/mensagem'
+import { Route as ApiPublicHooksProcessarFilaRouteImport } from './routes/api/public/hooks/processar-fila'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -26,6 +29,11 @@ const DisparoRoute = DisparoRouteImport.update({
   path: '/disparo',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FilaRoute = FilaRouteImport.update({
+  id: '/fila',
+  path: '/fila',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GruposCaminhaoRoute = GruposCaminhaoRouteImport.update({
   id: '/grupos-caminhao',
   path: '/grupos-caminhao',
@@ -34,6 +42,11 @@ const GruposCaminhaoRoute = GruposCaminhaoRouteImport.update({
 const IntegracaoRoute = IntegracaoRouteImport.update({
   id: '/integracao',
   path: '/integracao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksFreteRoute = ApiPublicHooksFreteRouteImport.update({
+  id: '/api/public/hooks/frete',
+  path: '/api/public/hooks/frete',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPublicHooksLimparChatsRoute =
@@ -47,66 +60,93 @@ const ApiPublicHooksMensagemRoute = ApiPublicHooksMensagemRouteImport.update({
   path: '/api/public/hooks/mensagem',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksProcessarFilaRoute =
+  ApiPublicHooksProcessarFilaRouteImport.update({
+    id: '/api/public/hooks/processar-fila',
+    path: '/api/public/hooks/processar-fila',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/fila': typeof FilaRoute
   '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
+  '/api/public/hooks/frete': typeof ApiPublicHooksFreteRoute
   '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
   '/api/public/hooks/mensagem': typeof ApiPublicHooksMensagemRoute
+  '/api/public/hooks/processar-fila': typeof ApiPublicHooksProcessarFilaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/fila': typeof FilaRoute
   '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
+  '/api/public/hooks/frete': typeof ApiPublicHooksFreteRoute
   '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
   '/api/public/hooks/mensagem': typeof ApiPublicHooksMensagemRoute
+  '/api/public/hooks/processar-fila': typeof ApiPublicHooksProcessarFilaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/fila': typeof FilaRoute
   '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
+  '/api/public/hooks/frete': typeof ApiPublicHooksFreteRoute
   '/api/public/hooks/limpar-chats': typeof ApiPublicHooksLimparChatsRoute
   '/api/public/hooks/mensagem': typeof ApiPublicHooksMensagemRoute
+  '/api/public/hooks/processar-fila': typeof ApiPublicHooksProcessarFilaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/disparo'
+    | '/fila'
     | '/grupos-caminhao'
     | '/integracao'
+    | '/api/public/hooks/frete'
     | '/api/public/hooks/limpar-chats'
     | '/api/public/hooks/mensagem'
+    | '/api/public/hooks/processar-fila'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/disparo'
+    | '/fila'
     | '/grupos-caminhao'
     | '/integracao'
+    | '/api/public/hooks/frete'
     | '/api/public/hooks/limpar-chats'
     | '/api/public/hooks/mensagem'
+    | '/api/public/hooks/processar-fila'
   id:
     | '__root__'
     | '/'
     | '/disparo'
+    | '/fila'
     | '/grupos-caminhao'
     | '/integracao'
+    | '/api/public/hooks/frete'
     | '/api/public/hooks/limpar-chats'
     | '/api/public/hooks/mensagem'
+    | '/api/public/hooks/processar-fila'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DisparoRoute: typeof DisparoRoute
+  FilaRoute: typeof FilaRoute
   GruposCaminhaoRoute: typeof GruposCaminhaoRoute
   IntegracaoRoute: typeof IntegracaoRoute
+  ApiPublicHooksFreteRoute: typeof ApiPublicHooksFreteRoute
   ApiPublicHooksLimparChatsRoute: typeof ApiPublicHooksLimparChatsRoute
   ApiPublicHooksMensagemRoute: typeof ApiPublicHooksMensagemRoute
+  ApiPublicHooksProcessarFilaRoute: typeof ApiPublicHooksProcessarFilaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -125,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DisparoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/fila': {
+      id: '/fila'
+      path: '/fila'
+      fullPath: '/fila'
+      preLoaderRoute: typeof FilaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/grupos-caminhao': {
       id: '/grupos-caminhao'
       path: '/grupos-caminhao'
@@ -137,6 +184,13 @@ declare module '@tanstack/react-router' {
       path: '/integracao'
       fullPath: '/integracao'
       preLoaderRoute: typeof IntegracaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/frete': {
+      id: '/api/public/hooks/frete'
+      path: '/api/public/hooks/frete'
+      fullPath: '/api/public/hooks/frete'
+      preLoaderRoute: typeof ApiPublicHooksFreteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/limpar-chats': {
@@ -153,16 +207,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksMensagemRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/processar-fila': {
+      id: '/api/public/hooks/processar-fila'
+      path: '/api/public/hooks/processar-fila'
+      fullPath: '/api/public/hooks/processar-fila'
+      preLoaderRoute: typeof ApiPublicHooksProcessarFilaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DisparoRoute: DisparoRoute,
+  FilaRoute: FilaRoute,
   GruposCaminhaoRoute: GruposCaminhaoRoute,
   IntegracaoRoute: IntegracaoRoute,
+  ApiPublicHooksFreteRoute: ApiPublicHooksFreteRoute,
   ApiPublicHooksLimparChatsRoute: ApiPublicHooksLimparChatsRoute,
   ApiPublicHooksMensagemRoute: ApiPublicHooksMensagemRoute,
+  ApiPublicHooksProcessarFilaRoute: ApiPublicHooksProcessarFilaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
