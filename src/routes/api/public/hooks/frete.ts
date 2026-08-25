@@ -4,7 +4,7 @@ export const Route = createFileRoute("/api/public/hooks/frete")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? "";
+        const apikey = request.headers.get("apikey") ?? new URL(request.url).searchParams.get("apikey") ?? "";
         const expected = process.env["SUPABASE_PUBLISHABLE_KEY"] ?? "";
         if (!expected || apikey !== expected) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
