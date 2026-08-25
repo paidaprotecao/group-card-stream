@@ -1,0 +1,68 @@
+{
+  "name": "uazapi → App Fila",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "seu_webhook_uazapi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-uazapi",
+      "name": "Webhook uazapi",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "seu_webhook_uazapi"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://project--091b67d1-9c2a-452d-a16a-cfda681b16ed-dev.lovable.app/api/public/hooks/frete",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_IEwIKvXiaWsBfMqDK4fElw_TeJZ5W1F"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "mensagem",
+              "value": "={{ JSON.stringify($json.body ?? $json) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "http-enviar-fila",
+      "name": "Enviar para fila",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    }
+  ],
+  "connections": {
+    "Webhook uazapi": {
+      "main": [
+        [
+          {
+            "node": "Enviar para fila",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null,
+  "tags": []
+}
