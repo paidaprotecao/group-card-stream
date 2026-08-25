@@ -253,8 +253,9 @@ export type EnfileirarResult = {
   duplicado: boolean;
   itens: number;
   ignorado?: boolean;
-  motivo?: string;
+  motivo?: string | undefined;
   categoria_origem?: string | null;
+
 };
 
 /** Triagem: só entra na fila quem vem de grupo com rota ativa (ex: frete_fechado, venda_fechado). */
