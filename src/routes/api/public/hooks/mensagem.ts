@@ -4,7 +4,7 @@ export const Route = createFileRoute("/api/public/hooks/mensagem")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? "";
+        const apikey = request.headers.get("apikey") ?? new URL(request.url).searchParams.get("apikey") ?? "";
         const expected = process.env["SUPABASE_PUBLISHABLE_KEY"] ?? "";
         if (!expected || apikey !== expected) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -25,11 +25,13 @@ export const Route = createFileRoute("/api/public/hooks/mensagem")({
 
         try {
           const { registrarLinksDoPayload } = await import("@/lib/grupos-caminhao.server");
+          const { enfileirarMensagem } = await import("@/lib/fila.server");
           const result = await registrarLinksDoPayload(payload);
+          const fila = await enfileirarMensagem(payload);
           console.log(
-            `[mensagem] ${result.encontrados} links · ${result.novos} novos · ${result.repetidos} repetidos`,
+            `[mensagem] ${result.encontrados} links · ${result.novos} novos · ${result.repetidos} repetidos · fila=${fila.ok ? fila.lote_id ?? fila.motivo ?? "ok" : fila.error}`,
           );
-          return Response.json({ success: true, ...result });
+          return Response.json({ success: true, links: result, fila });
         } catch (err) {
           console.error("[mensagem] falhou:", err);
           return new Response(
