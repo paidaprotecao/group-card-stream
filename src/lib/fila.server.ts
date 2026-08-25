@@ -172,12 +172,25 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const novoLote = !loteId;
 
   if (!loteId) {
+    // Descobre a categoria do grupo de origem (define para onde o pacote vai).
+    let categoriaOrigem: string | null = null;
+    if (msg.sourceChatId) {
+      const { data: origem } = await supabaseAdmin
+        .from("wa_groups")
+        .select("categoria, group_name")
+        .eq("chat_id", msg.sourceChatId)
+        .maybeSingle();
+      categoriaOrigem = origem?.categoria ?? null;
+      if (!msg.sourceGroupName && origem?.group_name) msg.sourceGroupName = origem.group_name;
+    }
+
     const { data: criado, error } = await supabaseAdmin
       .from("fila_lotes")
       .insert({
         sender: msg.sender,
         source_chat_id: msg.sourceChatId,
         source_group_name: msg.sourceGroupName,
+        categoria_origem: categoriaOrigem,
         status: "aguardando",
         fecha_em: fechaEm,
       })
@@ -187,6 +200,7 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
     loteId = criado.id;
     ordem = 0;
   }
+
 
   const { error: itemErr } = await supabaseAdmin.from("fila_itens").insert({
     lote_id: loteId,
