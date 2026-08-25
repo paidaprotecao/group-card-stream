@@ -3,6 +3,8 @@ export type LoteStatus = "aguardando" | "pronto" | "enviando" | "enviado" | "err
 export type FilaLote = {
   id: string;
   sender: string | null;
+  sender_phone: string | null;
+  sender_name: string | null;
   source_chat_id: string | null;
   source_group_name: string | null;
   categoria_origem: string | null;
@@ -22,6 +24,8 @@ export type RotaPostagem = {
   categoria_origem: string;
   destino_chat_id: string;
   destino_nome: string | null;
+  cabecalho: string | null;
+  enviar_contato: boolean;
   ativo: boolean;
   created_at: string;
   updated_at: string;
@@ -40,7 +44,7 @@ export type FilaItem = {
 };
 
 /** Segundos de espera após a última mensagem antes de considerar o pacote completo. */
-export const JANELA_SEGUNDOS = 45;
+export const JANELA_SEGUNDOS = 25;
 /** Intervalo entre envios para cada grupo (ms). */
 export const DELAY_ENTRE_GRUPOS = 1500;
 /** Intervalo entre itens do mesmo pacote (ms). */
