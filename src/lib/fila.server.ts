@@ -41,9 +41,12 @@ function valueAsString(value: unknown): string | null {
   return null;
 }
 
+const GROUP_JID_RE = /\d[\d-]{5,}@g\.us/i;
+const SENDER_JID_RE = /\d[\d:-]{5,}@(s\.whatsapp\.net|c\.us|lid)/i;
+
 function normalizeJid(value: string | null, suffix: "group" | "sender"): string | null {
   if (!value) return null;
-  const pattern = suffix === "group" ? /\d{6,}@g\.us/i : /\d{6,}@(s\.whatsapp\.net|c\.us|lid)/i;
+  const pattern = suffix === "group" ? GROUP_JID_RE : SENDER_JID_RE;
   const match = value.match(pattern);
   return match?.[0] ?? value.trim();
 }
@@ -103,11 +106,11 @@ function findAnyStringDeep(value: unknown, valueMatches: (value: string) => bool
 }
 
 function isGroupJid(value: string): boolean {
-  return /\d{6,}@g\.us/i.test(value);
+  return GROUP_JID_RE.test(value);
 }
 
 function isSenderJid(value: string): boolean {
-  return /\d{6,}@(s\.whatsapp\.net|c\.us|lid)/i.test(value);
+  return SENDER_JID_RE.test(value);
 }
 
 function pickGroupJid(payload: unknown, paths: string[]): string | null {
@@ -118,7 +121,14 @@ function pickGroupJid(payload: unknown, paths: string[]): string | null {
     payload,
     (key) => {
       const normalized = key.toLowerCase();
-      return normalized.includes("chat") || normalized.includes("remotejid") || normalized.includes("groupjid") || normalized === "jid";
+      return (
+        normalized.includes("chat") ||
+        normalized.includes("remotejid") ||
+        normalized.includes("groupjid") ||
+        normalized.includes("group") ||
+        normalized === "from" ||
+        normalized === "jid"
+      );
     },
     isGroupJid,
   );
@@ -145,8 +155,80 @@ function isMensagemTexto(value: string): boolean {
   if (!trimmed) return false;
   if (/^[{[]/.test(trimmed)) return false;
   if (/^https?:\/\//i.test(trimmed)) return false;
-  if (/\d{6,}@(g\.us|s\.whatsapp\.net|c\.us|lid)/i.test(trimmed)) return false;
+  if (/\d[\d:-]{5,}@(g\.us|s\.whatsapp\.net|c\.us|lid)/i.test(trimmed)) return false;
   return true;
+}
+
+function extrairTelefone(value: string | null): string | null {
+  if (!value || /@g\.us/i.test(value)) return null;
+  const base = value.split("@")[0] ?? value;
+  const phonePart = base.split(":")[0] ?? base;
+  const digits = phonePart.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15 ? digits : null;
+}
+
+function pickSenderPhone(payload: unknown, paths: string[]): string | null {
+  for (const path of paths) {
+    const phone = extrairTelefone(valueAsString(get(payload, path)));
+    if (phone) return phone;
+  }
+
+  const byKey = findStringDeep(
+    payload,
+    (key) => {
+      const normalized = key.toLowerCase();
+      return (
+        normalized.includes("phone") ||
+        normalized.includes("number") ||
+        normalized.includes("participant") ||
+        normalized.includes("sender") ||
+        normalized.includes("author") ||
+        normalized.includes("from")
+      );
+    },
+    (value) => Boolean(extrairTelefone(value)),
+  );
+
+  return extrairTelefone(byKey ?? findAnyStringDeep(payload, (value) => Boolean(extrairTelefone(value))));
+}
+
+export function temOrigemDeGrupo(payload: unknown): boolean {
+  const normalizado = unwrapMensagemPayload(payload);
+  return Boolean(
+    pickGroupJid(normalizado, [
+      "chatid",
+      "chatId",
+      "ChatID",
+      "chat.wa_chatid",
+      "body.chat.wa_chatid",
+      "message.chatid",
+      "message.chatId",
+      "message.chat_id",
+      "Message.chatid",
+      "Message.chatId",
+      "body.chatid",
+      "body.chatId",
+      "body.ChatID",
+      "body.message.chatid",
+      "body.message.chatId",
+      "body.message.chat_id",
+      "groupJid",
+      "group_id",
+      "remoteJid",
+      "message.remoteJid",
+      "key.remoteJid",
+      "message.key.remoteJid",
+      "Message.key.remoteJid",
+      "Data.key.remoteJid",
+      "Data.Key.remoteJid",
+      "Data.Key.RemoteJid",
+      "Data.Info.Chat",
+      "Data.Info.MessageSource.Chat",
+      "Data.Info.Source.Chat",
+      "event.Data.Info.Chat",
+      "event.Info.Chat",
+    ]),
+  );
 }
 
 function pickMessageText(payload: unknown, paths: string[]): string | null {
@@ -381,15 +463,6 @@ export type MensagemNormalizada = {
   externalId: string | null;
 };
 
-/** Extrai só os dígitos de um JID/telefone (ex: "5511999@s.whatsapp.net" -> "5511999"). */
-function extrairTelefone(value: string | null): string | null {
-  if (!value) return null;
-  const base = value.split("@")[0] ?? value;
-  const digits = base.replace(/\D/g, "");
-  return digits.length >= 10 && digits.length <= 15 ? digits : null;
-}
-
-
 export function normalizarMensagem(payload: unknown): MensagemNormalizada {
   const normalizado = unwrapMensagemPayload(payload);
   const tipoDetectado = detectarTipo(payload);
@@ -483,6 +556,28 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "body.from",
     "body.message.from",
   ]);
+  const senderPhone = pickSenderPhone(normalizado, [
+    "sender_pn",
+    "message.sender_pn",
+    "body.sender_pn",
+    "body.message.sender_pn",
+    "senderPhone",
+    "phone",
+    "number",
+    "Data.Info.Sender.User",
+    "Data.Info.MessageSource.Sender.User",
+    "Data.Info.Source.Sender.User",
+    "Data.Key.participant",
+    "Data.Key.Participant",
+    "participant",
+    "key.participant",
+    "message.key.participant",
+    "from",
+    "body.from",
+    "body.senderPhone",
+    "body.phone",
+    "body.number",
+  ]);
   const senderNome = pickStr(payload, [
     "senderName",
     "message.senderName",
@@ -494,17 +589,23 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "body.message.pushName",
     "notifyName",
     "message.notifyName",
+    "Data.PushName",
+    "Data.Info.PushName",
+    "Data.Info.SenderName",
+    "Data.Info.ParticipantName",
   ]);
 
   return {
     sender: senderNome ?? senderJid ?? null,
-    senderPhone: extrairTelefone(senderJid),
+    senderPhone: senderPhone ?? extrairTelefone(senderJid),
     senderName: senderNome,
 
     sourceChatId: pickGroupJid(normalizado, [
       "chatid",
       "chatId",
       "ChatID",
+      "chat.wa_chatid",
+      "body.chat.wa_chatid",
       "message.chatid",
       "message.chatId",
       "message.chat_id",
@@ -534,8 +635,12 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     ]),
     sourceGroupName: pickStr(normalizado, [
       "chatName",
+      "chat.name",
+      "chat.wa_name",
       "message.chatName",
       "body.chatName",
+      "body.chat.name",
+      "body.chat.wa_name",
       "body.message.chatName",
       "groupName",
       "group_name",
@@ -562,6 +667,8 @@ export type EnfileirarResult = {
   ignorado?: boolean;
   motivo?: string | undefined;
   categoria_origem?: string | null;
+  source_chat_id?: string | null;
+  source_group_name?: string | null;
 
 };
 
@@ -653,6 +760,8 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
       ignorado: true,
       motivo: triagem.motivo,
       categoria_origem: triagem.categoria,
+      source_chat_id: msg.sourceChatId,
+      source_group_name: msg.sourceGroupName,
     };
   }
   if (triagem.groupName) msg.sourceGroupName = triagem.groupName;
@@ -676,7 +785,16 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
       .eq("external_id", msg.externalId)
       .maybeSingle();
     if (dup) {
-      return { ok: true, lote_id: dup.lote_id, novo_lote: false, duplicado: true, itens: 0 };
+      return {
+        ok: true,
+        lote_id: dup.lote_id,
+        novo_lote: false,
+        duplicado: true,
+        itens: 0,
+        categoria_origem: triagem.categoria,
+        source_chat_id: msg.sourceChatId,
+        source_group_name: msg.sourceGroupName,
+      };
     }
   }
 
@@ -750,7 +868,16 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
     .eq("id", loteId);
   if (updErr) return { ok: false, error: updErr.message };
 
-  return { ok: true, lote_id: loteId, novo_lote: novoLote, duplicado: false, itens };
+  return {
+    ok: true,
+    lote_id: loteId,
+    novo_lote: novoLote,
+    duplicado: false,
+    itens,
+    categoria_origem: triagem.categoria,
+    source_chat_id: msg.sourceChatId,
+    source_group_name: msg.sourceGroupName,
+  };
 }
 
 type Grupo = {
