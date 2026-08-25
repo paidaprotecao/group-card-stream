@@ -190,6 +190,20 @@ function unwrapMensagemPayload(payload: unknown): unknown {
     if (parsed) return unwrapMensagemPayload(parsed);
   }
 
+  const body = record["body"];
+  if (typeof body === "string") {
+    const parsed = parseJsonString(body);
+    if (parsed) return unwrapMensagemPayload(parsed);
+  }
+
+  const event = record["event"] ?? record["Event"];
+  if (asRecord(event)) return unwrapMensagemPayload(event);
+
+  const upperData = record["Data"];
+  if (asRecord(upperData)) return payload;
+
+  if (asRecord(body)) return payload;
+
   return payload;
 }
 
@@ -222,6 +236,10 @@ function detectarTipo(payload: unknown): string {
       "Data.Message.videoMessage.mimetype",
       "Data.Message.audioMessage.mimetype",
       "Data.Message.documentMessage.mimetype",
+      "body.Data.Message.imageMessage.mimetype",
+      "body.Data.Message.videoMessage.mimetype",
+      "body.Data.Message.audioMessage.mimetype",
+      "body.Data.Message.documentMessage.mimetype",
     ]) ?? "";
   for (const [re, tipo] of MEDIA_KIND) if (re.test(raw)) return tipo;
 
