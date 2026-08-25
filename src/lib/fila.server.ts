@@ -763,6 +763,17 @@ export async function processarFila(maxLotes = 1) {
     let ultimoErro: string | null = null;
 
     for (const grupo of destinos) {
+      // 1) Cabeçalho separando cada frete/caminhão.
+      if (grupo.cabecalho && grupo.cabecalho.trim()) {
+        const cab = await enviarTexto(baseUrl, token, grupo.chat_id, grupo.cabecalho.trim());
+        if (!cab.ok) {
+          falhas += 1;
+          ultimoErro = cab.error ?? "erro no cabeçalho";
+        }
+        await new Promise((r) => setTimeout(r, DELAY_ENTRE_ITENS));
+      }
+
+      // 2) Mensagens encaminhadas, na ordem.
       for (const item of itens ?? []) {
         const res = await enviarItem(baseUrl, token, grupo, item);
         if (res.ok) enviados += 1;
@@ -772,8 +783,26 @@ export async function processarFila(maxLotes = 1) {
         }
         await new Promise((r) => setTimeout(r, DELAY_ENTRE_ITENS));
       }
+
+      // 3) Contato (vCard) de quem enviou.
+      if (grupo.enviar_contato !== false && lote.sender_phone) {
+        const contato = await enviarContato(
+          baseUrl,
+          token,
+          grupo.chat_id,
+          lote.sender_phone,
+          lote.sender_name ?? lote.sender ?? lote.sender_phone,
+        );
+        if (!contato.ok) {
+          falhas += 1;
+          ultimoErro = contato.error ?? "erro no contato";
+        }
+        await new Promise((r) => setTimeout(r, DELAY_ENTRE_ITENS));
+      }
+
       await new Promise((r) => setTimeout(r, DELAY_ENTRE_GRUPOS));
     }
+
 
 
     await supabaseAdmin
