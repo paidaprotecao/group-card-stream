@@ -676,12 +676,17 @@ export async function processarFila(maxLotes = 1) {
   // Rotas por categoria de origem (ex: frete_fechado -> Fretes br).
   const { data: rotas } = await supabaseAdmin
     .from("rotas_postagem")
-    .select("categoria_origem, destino_chat_id, destino_nome")
+    .select("categoria_origem, destino_chat_id, destino_nome, cabecalho, enviar_contato")
     .eq("ativo", true);
   const rotaPorCategoria = new Map<string, Grupo[]>();
   for (const rota of rotas ?? []) {
     const lista = rotaPorCategoria.get(rota.categoria_origem) ?? [];
-    lista.push({ chat_id: rota.destino_chat_id, group_name: rota.destino_nome });
+    lista.push({
+      chat_id: rota.destino_chat_id,
+      group_name: rota.destino_nome,
+      cabecalho: rota.cabecalho ?? null,
+      enviar_contato: rota.enviar_contato !== false,
+    });
     rotaPorCategoria.set(rota.categoria_origem, lista);
   }
 
@@ -691,7 +696,8 @@ export async function processarFila(maxLotes = 1) {
 
   const { data: lotes, error: lotesErr } = await supabaseAdmin
     .from("fila_lotes")
-    .select("id, categoria_origem, source_chat_id")
+    .select("id, categoria_origem, source_chat_id, sender, sender_name, sender_phone")
+
     .eq("status", "pronto")
     .order("created_at", { ascending: true })
     .limit(Math.max(1, Math.min(maxLotes, 5)));
