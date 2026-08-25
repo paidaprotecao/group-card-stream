@@ -534,7 +534,13 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const itens = ordem + 1;
   const { error: updErr } = await supabaseAdmin
     .from("fila_lotes")
-    .update({ itens_count: itens, fecha_em: fechaEm })
+    .update({
+      itens_count: itens,
+      fecha_em: fechaEm,
+      ...(msg.senderPhone ? { sender_phone: msg.senderPhone } : {}),
+      ...(msg.senderName ? { sender_name: msg.senderName } : {}),
+    })
+
     .eq("id", loteId);
   if (updErr) return { ok: false, error: updErr.message };
 
