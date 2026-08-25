@@ -12,7 +12,8 @@ function get(obj: unknown, path: string): unknown {
 function pickStr(payload: unknown, paths: string[]): string | null {
   for (const p of paths) {
     const v = get(payload, p);
-    if (typeof v === "string" && v.trim()) return v.trim();
+    const str = valueAsString(v);
+    if (str) return str;
   }
   return null;
 }
@@ -21,6 +22,145 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function valueAsString(value: unknown): string | null {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  const record = asRecord(value);
+  if (!record) return null;
+
+  const serialized = record["_serialized"] ?? record["serialized"] ?? record["String"];
+  if (typeof serialized === "string" && serialized.trim()) return serialized.trim();
+
+  const user = record["User"] ?? record["user"];
+  const server = record["Server"] ?? record["server"];
+  if ((typeof user === "string" || typeof user === "number") && typeof server === "string" && server.trim()) {
+    return `${String(user).trim()}@${server.trim()}`;
+  }
+
+  return null;
+}
+
+function normalizeJid(value: string | null, suffix: "group" | "sender"): string | null {
+  if (!value) return null;
+  const pattern = suffix === "group" ? /\d{6,}@g\.us/i : /\d{6,}@(s\.whatsapp\.net|c\.us|lid)/i;
+  const match = value.match(pattern);
+  return match?.[0] ?? value.trim();
+}
+
+function findStringDeep(
+  value: unknown,
+  keyMatches: (key: string) => boolean,
+  valueMatches: (value: string) => boolean,
+  depth = 0,
+): string | null {
+  if (depth > 8) return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findStringDeep(item, keyMatches, valueMatches, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = asRecord(value);
+  if (!record) return null;
+
+  for (const [key, raw] of Object.entries(record)) {
+    const str = valueAsString(raw);
+    if (str && keyMatches(key) && valueMatches(str)) return str;
+  }
+
+  for (const raw of Object.values(record)) {
+    const found = findStringDeep(raw, keyMatches, valueMatches, depth + 1);
+    if (found) return found;
+  }
+
+  return null;
+}
+
+function findAnyStringDeep(value: unknown, valueMatches: (value: string) => boolean, depth = 0): string | null {
+  if (depth > 8) return null;
+
+  const str = valueAsString(value);
+  if (str && valueMatches(str)) return str;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findAnyStringDeep(item, valueMatches, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = asRecord(value);
+  if (!record) return null;
+  for (const raw of Object.values(record)) {
+    const found = findAnyStringDeep(raw, valueMatches, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
+function isGroupJid(value: string): boolean {
+  return /\d{6,}@g\.us/i.test(value);
+}
+
+function isSenderJid(value: string): boolean {
+  return /\d{6,}@(s\.whatsapp\.net|c\.us|lid)/i.test(value);
+}
+
+function pickGroupJid(payload: unknown, paths: string[]): string | null {
+  const explicit = normalizeJid(pickStr(payload, paths), "group");
+  if (explicit && isGroupJid(explicit)) return explicit;
+
+  const byKey = findStringDeep(
+    payload,
+    (key) => {
+      const normalized = key.toLowerCase();
+      return normalized.includes("chat") || normalized.includes("remotejid") || normalized.includes("groupjid") || normalized === "jid";
+    },
+    isGroupJid,
+  );
+  return normalizeJid(byKey ?? findAnyStringDeep(payload, isGroupJid), "group");
+}
+
+function pickSenderJid(payload: unknown, paths: string[]): string | null {
+  const explicit = normalizeJid(pickStr(payload, paths), "sender");
+  if (explicit && isSenderJid(explicit)) return explicit;
+
+  const byKey = findStringDeep(
+    payload,
+    (key) => {
+      const normalized = key.toLowerCase();
+      return normalized.includes("sender") || normalized.includes("participant") || normalized.includes("author");
+    },
+    isSenderJid,
+  );
+  return normalizeJid(byKey ?? findAnyStringDeep(payload, isSenderJid), "sender");
+}
+
+function isMensagemTexto(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^[{[]/.test(trimmed)) return false;
+  if (/^https?:\/\//i.test(trimmed)) return false;
+  if (/\d{6,}@(g\.us|s\.whatsapp\.net|c\.us|lid)/i.test(trimmed)) return false;
+  return true;
+}
+
+function pickMessageText(payload: unknown, paths: string[]): string | null {
+  const explicit = pickStr(payload, paths);
+  if (explicit && isMensagemTexto(explicit)) return explicit;
+
+  return findStringDeep(
+    payload,
+    (key) => {
+      const normalized = key.toLowerCase();
+      return normalized === "text" || normalized === "caption" || normalized === "conversation" || normalized === "content" || normalized === "body";
+    },
+    isMensagemTexto,
+  );
 }
 
 function parseJsonString(value: string): unknown | null {
@@ -64,13 +204,24 @@ function detectarTipo(payload: unknown): string {
   const raw =
     pickStr(payload, [
       "messageType",
+      "Data.Message.Type",
+      "Data.messageType",
+      "Data.type",
       "message.messageType",
+      "Message.messageType",
       "type",
       "message.type",
+      "Message.type",
       "mediaType",
       "message.mediaType",
+      "Message.mediaType",
       "mimetype",
       "message.mimetype",
+      "Message.mimetype",
+      "Data.Message.imageMessage.mimetype",
+      "Data.Message.videoMessage.mimetype",
+      "Data.Message.audioMessage.mimetype",
+      "Data.Message.documentMessage.mimetype",
     ]) ?? "";
   for (const [re, tipo] of MEDIA_KIND) if (re.test(raw)) return tipo;
 
@@ -252,15 +403,32 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
   ]);
   const mediaUrl = isUrl(mediaUrlBruto) ? mediaUrlBruto : null;
 
-  let text = pickStr(payload, [
+  let text = pickMessageText(payload, [
     "text",
     "message.text",
+    "Message.text",
+    "Data.text",
+    "Data.Message.text",
+    "Data.Message.conversation",
+    "Data.Message.extendedTextMessage.text",
+    "Data.Message.imageMessage.caption",
+    "Data.Message.videoMessage.caption",
+    "Data.Message.documentMessage.caption",
+    "data.Message.conversation",
+    "data.message.conversation",
     "caption",
     "message.caption",
+    "Message.caption",
     "body",
     "message.body",
+    "Message.body",
     "body.text",
     "body.message.text",
+    "body.Data.Message.conversation",
+    "body.Data.Message.extendedTextMessage.text",
+    "body.Data.Message.imageMessage.caption",
+    "body.Data.Message.videoMessage.caption",
+    "body.Data.Message.documentMessage.caption",
     "body.caption",
     "body.message.caption",
     "body.body",
@@ -275,17 +443,24 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
 
   const tipo = mediaUrl ? (tipoDetectado === "text" ? "image" : tipoDetectado) : tipoDetectado;
 
-  const senderJid = pickStr(payload, [
+  const senderJid = pickSenderJid(normalizado, [
+    "participant",
+    "key.participant",
+    "message.key.participant",
+    "Message.key.participant",
+    "Data.key.participant",
+    "Data.Key.participant",
+    "Data.Key.Participant",
+    "Data.Info.Sender",
+    "Data.Info.MessageSource.Sender",
+    "Data.Info.Source.Sender",
+    "event.Data.Info.Sender",
+    "event.Info.Sender",
+    "senderJid",
     "sender",
     "message.sender",
     "body.sender",
     "body.message.sender",
-    "participant",
-    "body.participant",
-    "body.message.participant",
-    "key.participant",
-    "message.key.participant",
-    "senderJid",
     "from",
     "body.from",
     "body.message.from",
@@ -308,14 +483,18 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     senderPhone: extrairTelefone(senderJid),
     senderName: senderNome,
 
-    sourceChatId: pickStr(normalizado, [
+    sourceChatId: pickGroupJid(normalizado, [
       "chatid",
       "chatId",
+      "ChatID",
       "message.chatid",
       "message.chatId",
       "message.chat_id",
+      "Message.chatid",
+      "Message.chatId",
       "body.chatid",
       "body.chatId",
+      "body.ChatID",
       "body.message.chatid",
       "body.message.chatId",
       "body.message.chat_id",
@@ -325,6 +504,15 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
       "message.remoteJid",
       "key.remoteJid",
       "message.key.remoteJid",
+      "Message.key.remoteJid",
+      "Data.key.remoteJid",
+      "Data.Key.remoteJid",
+      "Data.Key.RemoteJid",
+      "Data.Info.Chat",
+      "Data.Info.MessageSource.Chat",
+      "Data.Info.Source.Chat",
+      "event.Data.Info.Chat",
+      "event.Info.Chat",
     ]),
     sourceGroupName: pickStr(normalizado, [
       "chatName",
