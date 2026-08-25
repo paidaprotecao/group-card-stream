@@ -27,7 +27,8 @@ export const Route = createFileRoute("/api/public/hooks/mensagem")({
           const { registrarLinksDoPayload } = await import("@/lib/grupos-caminhao.server");
           const { enfileirarMensagem, temOrigemDeGrupo } = await import("@/lib/fila.server");
           const result = await registrarLinksDoPayload(payload);
-          const fila = temOrigemDeGrupo(payload)
+          const temGrupo = temOrigemDeGrupo(payload);
+          const fila = temGrupo
             ? await enfileirarMensagem(payload)
             : {
                 ok: true as const,
@@ -40,10 +41,16 @@ export const Route = createFileRoute("/api/public/hooks/mensagem")({
                 source_chat_id: null,
                 categoria_origem: null,
               };
-          console.log(
-            `[mensagem] ${result.encontrados} links · ${result.novos} novos · ${result.repetidos} repetidos · fila=${fila.ok ? `${fila.lote_id ?? fila.motivo ?? "ok"} · origem=${fila.source_chat_id ?? "sem-origem"} · categoria=${fila.categoria_origem ?? "sem-categoria"}` : fila.error}`,
-          );
+          const resumo = `links=${result.encontrados}/${result.novos} · temGrupo=${temGrupo} · fila=${fila.ok ? `${fila.lote_id ?? fila.motivo ?? "ok"} · origem=${fila.source_chat_id ?? "sem-origem"} · categoria=${fila.categoria_origem ?? "sem-categoria"}` : fila.error}`;
+          console.log(`[mensagem] ${resumo}`);
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            await supabaseAdmin.from("webhook_debug").insert({ hook: "mensagem", payload: payload as never, resumo });
+          } catch (logErr) {
+            console.error("[mensagem] debug log falhou:", logErr);
+          }
           return Response.json({ success: true, links: result, fila });
+
         } catch (err) {
           console.error("[mensagem] falhou:", err);
           return new Response(
