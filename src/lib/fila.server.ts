@@ -567,8 +567,9 @@ export async function processarFila(maxLotes = 1) {
       }
     }
 
-    const destinos: Grupo[] =
-      (categoria ? rotaPorCategoria.get(categoria) : undefined) ?? (grupos ?? []);
+    // Só posta no destino da rota da categoria de origem (sem fallback "posta em tudo").
+    const destinos: Grupo[] = (categoria ? rotaPorCategoria.get(categoria) : undefined) ?? [];
+
 
     if (destinos.length === 0) {
       await supabaseAdmin
