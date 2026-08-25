@@ -23,22 +23,34 @@ export const Route = createFileRoute("/api/public/hooks/frete")({
           });
         }
 
+        const registrarDebug = async (resumo: string) => {
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            await supabaseAdmin.from("webhook_debug").insert({ hook: "frete", payload: payload as never, resumo });
+          } catch (logErr) {
+            console.error("[fila] debug log falhou:", logErr);
+          }
+        };
+
         try {
           const { enfileirarMensagem } = await import("@/lib/fila.server");
           const result = await enfileirarMensagem(payload);
           if (!result.ok) {
+            await registrarDebug(`erro=${result.error}`);
             return Response.json({ success: false, error: result.error }, { status: 422 });
           }
           if (result.ignorado) {
-            console.log(
-              `[fila] ignorado · ${result.motivo} · origem=${result.source_chat_id ?? "sem-origem"} · categoria=${result.categoria_origem ?? "sem-categoria"}`,
-            );
+            const resumo = `ignorado · ${result.motivo} · origem=${result.source_chat_id ?? "sem-origem"} · categoria=${result.categoria_origem ?? "sem-categoria"}`;
+            console.log(`[fila] ${resumo}`);
+            await registrarDebug(resumo);
             return Response.json({ success: true, ...result });
           }
-          console.log(
-            `[fila] lote ${result.lote_id} · itens ${result.itens} · novo=${result.novo_lote} · dup=${result.duplicado} · origem=${result.source_chat_id ?? "sem-origem"} · categoria=${result.categoria_origem ?? "sem-categoria"}`,
-          );
+          const resumo = `lote ${result.lote_id} · itens ${result.itens} · novo=${result.novo_lote} · dup=${result.duplicado} · origem=${result.source_chat_id ?? "sem-origem"} · categoria=${result.categoria_origem ?? "sem-categoria"}`;
+          console.log(`[fila] ${resumo}`);
+          await registrarDebug(resumo);
           return Response.json({ success: true, ...result });
+
+
 
         } catch (err) {
           console.error("[fila] falhou:", err);
