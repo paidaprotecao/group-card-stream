@@ -290,19 +290,33 @@ export async function processarFila(maxLotes = 1) {
     return { ok: true as const, processados: 0, motivo: "já existe um lote em envio" };
   }
 
+  // Destino padrão: todos os grupos ativos de "Aberto postável".
   const { data: grupos, error: gruposErr } = await supabaseAdmin
     .from("wa_groups")
     .select("chat_id, group_name")
     .eq("categoria", "aberto_postavel")
     .eq("ativo", true);
   if (gruposErr) return { ok: false as const, error: gruposErr.message };
-  if (!grupos || grupos.length === 0) {
-    return { ok: true as const, processados: 0, motivo: "nenhum grupo ativo em Aberto postável" };
+
+  // Rotas por categoria de origem (ex: frete_fechado -> Fretes br).
+  const { data: rotas } = await supabaseAdmin
+    .from("rotas_postagem")
+    .select("categoria_origem, destino_chat_id, destino_nome")
+    .eq("ativo", true);
+  const rotaPorCategoria = new Map<string, Grupo[]>();
+  for (const rota of rotas ?? []) {
+    const lista = rotaPorCategoria.get(rota.categoria_origem) ?? [];
+    lista.push({ chat_id: rota.destino_chat_id, group_name: rota.destino_nome });
+    rotaPorCategoria.set(rota.categoria_origem, lista);
+  }
+
+  if ((!grupos || grupos.length === 0) && rotaPorCategoria.size === 0) {
+    return { ok: true as const, processados: 0, motivo: "nenhum destino configurado" };
   }
 
   const { data: lotes, error: lotesErr } = await supabaseAdmin
     .from("fila_lotes")
-    .select("id")
+    .select("id, categoria_origem, source_chat_id")
     .eq("status", "pronto")
     .order("created_at", { ascending: true })
     .limit(Math.max(1, Math.min(maxLotes, 5)));
@@ -324,6 +338,38 @@ export async function processarFila(maxLotes = 1) {
       .select("id");
     if (!travado || travado.length === 0) continue;
 
+    // Se a categoria de origem não veio no pacote, busca agora pelo chat de origem.
+    let categoria = lote.categoria_origem;
+    if (!categoria && lote.source_chat_id) {
+      const { data: origem } = await supabaseAdmin
+        .from("wa_groups")
+        .select("categoria")
+        .eq("chat_id", lote.source_chat_id)
+        .maybeSingle();
+      categoria = origem?.categoria ?? null;
+      if (categoria) {
+        await supabaseAdmin
+          .from("fila_lotes")
+          .update({ categoria_origem: categoria })
+          .eq("id", lote.id);
+      }
+    }
+
+    const destinos: Grupo[] =
+      (categoria ? rotaPorCategoria.get(categoria) : undefined) ?? (grupos ?? []);
+
+    if (destinos.length === 0) {
+      await supabaseAdmin
+        .from("fila_lotes")
+        .update({
+          status: "erro",
+          erro: `Sem destino configurado para a origem "${categoria ?? "desconhecida"}"`,
+          sent_at: new Date().toISOString(),
+        })
+        .eq("id", lote.id);
+      continue;
+    }
+
     const { data: itens } = await supabaseAdmin
       .from("fila_itens")
       .select("tipo, text, media_url, doc_name")
@@ -334,7 +380,7 @@ export async function processarFila(maxLotes = 1) {
     let falhas = 0;
     let ultimoErro: string | null = null;
 
-    for (const grupo of grupos) {
+    for (const grupo of destinos) {
       for (const item of itens ?? []) {
         const res = await enviarItem(baseUrl, token, grupo, item);
         if (res.ok) enviados += 1;
@@ -346,6 +392,7 @@ export async function processarFila(maxLotes = 1) {
       }
       await new Promise((r) => setTimeout(r, DELAY_ENTRE_GRUPOS));
     }
+
 
     await supabaseAdmin
       .from("fila_lotes")
