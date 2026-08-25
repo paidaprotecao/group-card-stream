@@ -23,6 +23,36 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function parseJsonString(value: string): unknown | null {
+  const trimmed = value.trim();
+  if (!trimmed || !/^[{[]/.test(trimmed)) return null;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+function unwrapMensagemPayload(payload: unknown): unknown {
+  const record = asRecord(payload);
+  if (!record) return payload;
+
+  const mensagem = record["mensagem"];
+  if (typeof mensagem === "string") {
+    const parsed = parseJsonString(mensagem);
+    if (parsed) return unwrapMensagemPayload(parsed);
+  }
+  if (asRecord(mensagem)) return unwrapMensagemPayload(mensagem);
+
+  const data = record["data"];
+  if (typeof data === "string") {
+    const parsed = parseJsonString(data);
+    if (parsed) return unwrapMensagemPayload(parsed);
+  }
+
+  return payload;
+}
+
 const MEDIA_KIND: Array<[RegExp, string]> = [
   [/image|photo|figur/i, "image"],
   [/video/i, "video"],
@@ -81,7 +111,8 @@ function isProvavelBase64(value: string | null): boolean {
 }
 
 function payloadParaDownload(payload: unknown): unknown {
-  return get(payload, "message") ?? get(payload, "body.message") ?? payload;
+  const unwrapped = unwrapMensagemPayload(payload);
+  return get(unwrapped, "message") ?? get(unwrapped, "body.message") ?? unwrapped;
 }
 
 function pickMediaBaixada(payload: unknown): string | null {
@@ -180,6 +211,7 @@ export type MensagemNormalizada = {
 };
 
 export function normalizarMensagem(payload: unknown): MensagemNormalizada {
+  const normalizado = unwrapMensagemPayload(payload);
   const tipoDetectado = detectarTipo(payload);
   const mediaUrlBruto = pickStr(payload, [
     "file",
@@ -194,6 +226,18 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "message.downloadUrl",
     "content",
     "message.content",
+    "body.file",
+    "body.message.file",
+    "body.fileURL",
+    "body.message.fileURL",
+    "body.mediaUrl",
+    "body.message.mediaUrl",
+    "body.url",
+    "body.message.url",
+    "body.downloadUrl",
+    "body.message.downloadUrl",
+    "body.content",
+    "body.message.content",
   ]);
   const mediaUrl = isUrl(mediaUrlBruto) ? mediaUrlBruto : null;
 
@@ -204,10 +248,17 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "message.caption",
     "body",
     "message.body",
+    "body.text",
+    "body.message.text",
+    "body.caption",
+    "body.message.caption",
+    "body.body",
+    "body.message.body",
+    "body.conteudo",
     "conteudo",
   ]);
   if (!text) {
-    const content = pickStr(payload, ["content", "message.content"]);
+    const content = pickStr(payload, ["content", "message.content", "body.content", "body.message.content"]);
     if (content && !isUrl(content)) text = content;
   }
 
@@ -218,31 +269,55 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
       pickStr(payload, [
         "sender",
         "message.sender",
+        "body.sender",
+        "body.message.sender",
         "senderName",
         "message.senderName",
+        "body.senderName",
+        "body.message.senderName",
         "participant",
+        "body.participant",
+        "body.message.participant",
         "from",
+        "body.from",
+        "body.message.from",
       ]) ?? null,
-    sourceChatId: pickStr(payload, [
+    sourceChatId: pickStr(normalizado, [
       "chatid",
       "chatId",
       "message.chatid",
       "message.chatId",
+      "message.chat_id",
+      "body.chatid",
+      "body.chatId",
+      "body.message.chatid",
+      "body.message.chatId",
+      "body.message.chat_id",
       "groupJid",
       "group_id",
+      "remoteJid",
+      "message.remoteJid",
+      "key.remoteJid",
+      "message.key.remoteJid",
     ]),
-    sourceGroupName: pickStr(payload, [
+    sourceGroupName: pickStr(normalizado, [
       "chatName",
       "message.chatName",
+      "body.chatName",
+      "body.message.chatName",
       "groupName",
       "group_name",
+      "body.groupName",
+      "body.group_name",
+      "body.message.groupName",
+      "body.message.group_name",
       "grupo",
     ]),
     tipo,
     text: text ? text.slice(0, 4000) : null,
     mediaUrl,
-    docName: pickStr(payload, ["docName", "message.docName", "fileName", "message.fileName"]),
-    externalId: pickStr(payload, ["messageid", "messageId", "message.messageid", "message.id", "id"]),
+    docName: pickStr(normalizado, ["docName", "message.docName", "fileName", "message.fileName", "body.docName", "body.message.docName", "body.fileName", "body.message.fileName"]),
+    externalId: pickStr(normalizado, ["messageid", "messageId", "message.messageid", "message.id", "id", "body.messageid", "body.messageId", "body.message.messageid", "body.message.id"]),
   };
 }
 
@@ -329,7 +404,8 @@ async function triarOrigem(
 
 /** Guarda a mensagem no pacote aberto do mesmo remetente/grupo (ou cria um novo). */
 export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarResult | { ok: false; error: string }> {
-  const msg = normalizarMensagem(payload);
+  const payloadNormalizado = unwrapMensagemPayload(payload);
+  const msg = normalizarMensagem(payloadNormalizado);
 
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -350,7 +426,7 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   if (triagem.groupName) msg.sourceGroupName = triagem.groupName;
 
   if (!msg.mediaUrl && msg.tipo !== "text") {
-    const baixada = await baixarMidiaDaMensagem(payload);
+    const baixada = await baixarMidiaDaMensagem(payloadNormalizado);
     if (!baixada.ok) return { ok: false, error: baixada.error };
     msg.mediaUrl = baixada.mediaUrl;
     msg.tipo = baixada.tipo ?? msg.tipo;
