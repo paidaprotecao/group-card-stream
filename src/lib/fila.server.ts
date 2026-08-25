@@ -275,24 +275,39 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
 
   const tipo = mediaUrl ? (tipoDetectado === "text" ? "image" : tipoDetectado) : tipoDetectado;
 
+  const senderJid = pickStr(payload, [
+    "sender",
+    "message.sender",
+    "body.sender",
+    "body.message.sender",
+    "participant",
+    "body.participant",
+    "body.message.participant",
+    "key.participant",
+    "message.key.participant",
+    "senderJid",
+    "from",
+    "body.from",
+    "body.message.from",
+  ]);
+  const senderNome = pickStr(payload, [
+    "senderName",
+    "message.senderName",
+    "body.senderName",
+    "body.message.senderName",
+    "pushName",
+    "message.pushName",
+    "body.pushName",
+    "body.message.pushName",
+    "notifyName",
+    "message.notifyName",
+  ]);
+
   return {
-    sender:
-      pickStr(payload, [
-        "sender",
-        "message.sender",
-        "body.sender",
-        "body.message.sender",
-        "senderName",
-        "message.senderName",
-        "body.senderName",
-        "body.message.senderName",
-        "participant",
-        "body.participant",
-        "body.message.participant",
-        "from",
-        "body.from",
-        "body.message.from",
-      ]) ?? null,
+    sender: senderNome ?? senderJid ?? null,
+    senderPhone: extrairTelefone(senderJid),
+    senderName: senderNome,
+
     sourceChatId: pickStr(normalizado, [
       "chatid",
       "chatId",
