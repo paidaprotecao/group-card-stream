@@ -14,6 +14,101 @@ export type Database = {
   }
   public: {
     Tables: {
+      fila_itens: {
+        Row: {
+          created_at: string
+          doc_name: string | null
+          external_id: string | null
+          id: string
+          lote_id: string
+          media_url: string | null
+          ordem: number
+          text: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          doc_name?: string | null
+          external_id?: string | null
+          id?: string
+          lote_id: string
+          media_url?: string | null
+          ordem?: number
+          text?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          doc_name?: string | null
+          external_id?: string | null
+          id?: string
+          lote_id?: string
+          media_url?: string | null
+          ordem?: number
+          text?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fila_itens_lote_id_fkey"
+            columns: ["lote_id"]
+            isOneToOne: false
+            referencedRelation: "fila_lotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fila_lotes: {
+        Row: {
+          created_at: string
+          enviados: number
+          erro: string | null
+          falhas: number
+          fecha_em: string
+          id: string
+          itens_count: number
+          sender: string | null
+          sent_at: string | null
+          source_chat_id: string | null
+          source_group_name: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enviados?: number
+          erro?: string | null
+          falhas?: number
+          fecha_em?: string
+          id?: string
+          itens_count?: number
+          sender?: string | null
+          sent_at?: string | null
+          source_chat_id?: string | null
+          source_group_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enviados?: number
+          erro?: string | null
+          falhas?: number
+          fecha_em?: string
+          id?: string
+          itens_count?: number
+          sender?: string | null
+          sent_at?: string | null
+          source_chat_id?: string | null
+          source_group_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       grupos_caminhao: {
         Row: {
           created_at: string
