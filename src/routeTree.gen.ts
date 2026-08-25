@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DisparoRouteImport } from './routes/disparo'
+import { Route as FilaRouteImport } from './routes/fila'
 import { Route as GruposCaminhaoRouteImport } from './routes/grupos-caminhao'
 import { Route as IntegracaoRouteImport } from './routes/integracao'
 import { Route as ApiPublicHooksFreteRouteImport } from './routes/api/public/hooks/frete'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const DisparoRoute = DisparoRouteImport.update({
   id: '/disparo',
   path: '/disparo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FilaRoute = FilaRouteImport.update({
+  id: '/fila',
+  path: '/fila',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GruposCaminhaoRoute = GruposCaminhaoRouteImport.update({
@@ -64,6 +70,7 @@ const ApiPublicHooksProcessarFilaRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/fila': typeof FilaRoute
   '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
   '/api/public/hooks/frete': typeof ApiPublicHooksFreteRoute
@@ -74,6 +81,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/fila': typeof FilaRoute
   '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
   '/api/public/hooks/frete': typeof ApiPublicHooksFreteRoute
@@ -85,6 +93,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/disparo': typeof DisparoRoute
+  '/fila': typeof FilaRoute
   '/grupos-caminhao': typeof GruposCaminhaoRoute
   '/integracao': typeof IntegracaoRoute
   '/api/public/hooks/frete': typeof ApiPublicHooksFreteRoute
@@ -97,6 +106,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/disparo'
+    | '/fila'
     | '/grupos-caminhao'
     | '/integracao'
     | '/api/public/hooks/frete'
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/disparo'
+    | '/fila'
     | '/grupos-caminhao'
     | '/integracao'
     | '/api/public/hooks/frete'
@@ -117,6 +128,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/disparo'
+    | '/fila'
     | '/grupos-caminhao'
     | '/integracao'
     | '/api/public/hooks/frete'
@@ -128,6 +140,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DisparoRoute: typeof DisparoRoute
+  FilaRoute: typeof FilaRoute
   GruposCaminhaoRoute: typeof GruposCaminhaoRoute
   IntegracaoRoute: typeof IntegracaoRoute
   ApiPublicHooksFreteRoute: typeof ApiPublicHooksFreteRoute
@@ -150,6 +163,13 @@ declare module '@tanstack/react-router' {
       path: '/disparo'
       fullPath: '/disparo'
       preLoaderRoute: typeof DisparoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fila': {
+      id: '/fila'
+      path: '/fila'
+      fullPath: '/fila'
+      preLoaderRoute: typeof FilaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/grupos-caminhao': {
@@ -200,6 +220,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DisparoRoute: DisparoRoute,
+  FilaRoute: FilaRoute,
   GruposCaminhaoRoute: GruposCaminhaoRoute,
   IntegracaoRoute: IntegracaoRoute,
   ApiPublicHooksFreteRoute: ApiPublicHooksFreteRoute,
