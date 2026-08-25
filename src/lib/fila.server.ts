@@ -37,14 +37,14 @@ function unwrapMensagemPayload(payload: unknown): unknown {
   const record = asRecord(payload);
   if (!record) return payload;
 
-  const mensagem = record.mensagem;
+  const mensagem = record["mensagem"];
   if (typeof mensagem === "string") {
     const parsed = parseJsonString(mensagem);
     if (parsed) return unwrapMensagemPayload(parsed);
   }
   if (asRecord(mensagem)) return unwrapMensagemPayload(mensagem);
 
-  const data = record.data;
+  const data = record["data"];
   if (typeof data === "string") {
     const parsed = parseJsonString(data);
     if (parsed) return unwrapMensagemPayload(parsed);
