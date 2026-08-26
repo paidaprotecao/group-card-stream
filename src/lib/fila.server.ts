@@ -647,7 +647,8 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "data.Data.Info.PushName",
     "data.Data.Info.SenderName",
     "data.Data.Info.ParticipantName",
-  ]);
+  ]) ?? pickSenderNomeDeep(payload) ?? pickSenderNomeDeep(normalizado);
+
 
   return {
     sender: senderNome ?? senderJid ?? null,
