@@ -624,6 +624,7 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "data.message.from",
   ]);
   const senderNome = pickStr(normalizado, [
+
     "senderName",
     "message.senderName",
     "body.senderName",
