@@ -494,8 +494,8 @@ export type MensagemNormalizada = {
 
 export function normalizarMensagem(payload: unknown): MensagemNormalizada {
   const normalizado = unwrapMensagemPayload(payload);
-  const tipoDetectado = detectarTipo(payload);
-  const mediaUrlBruto = pickStr(payload, [
+  const tipoDetectado = detectarTipo(normalizado);
+  const mediaUrlBruto = pickStr(normalizado, [
     "file",
     "message.file",
     "fileURL",
@@ -523,7 +523,7 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
   ]);
   const mediaUrl = isUrl(mediaUrlBruto) ? mediaUrlBruto : null;
 
-  let text = pickMessageText(payload, [
+  let text = pickMessageText(normalizado, [
     "text",
     "message.text",
     "Message.text",
@@ -557,7 +557,7 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "conteudo",
   ]);
   if (!text) {
-    const content = pickStr(payload, ["content", "message.content", "body.content", "body.message.content"]);
+    const content = pickStr(normalizado, ["content", "message.content", "body.content", "body.message.content"]);
     if (content && !isUrl(content)) text = content;
   }
 
@@ -622,7 +622,7 @@ export function normalizarMensagem(payload: unknown): MensagemNormalizada {
     "data.from",
     "data.message.from",
   ]);
-  const senderNome = pickStr(payload, [
+  const senderNome = pickStr(normalizado, [
     "senderName",
     "message.senderName",
     "body.senderName",
