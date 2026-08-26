@@ -166,7 +166,8 @@ function isMensagemTexto(value: string): boolean {
 }
 
 function extrairTelefone(value: string | null): string | null {
-  if (!value || /@g\.us/i.test(value)) return null;
+  // @lid é um identificador interno do WhatsApp, não um telefone real.
+  if (!value || /@g\.us/i.test(value) || /@lid/i.test(value)) return null;
   const base = value.split("@")[0] ?? value;
   const phonePart = base.split(":")[0] ?? base;
   const digits = phonePart.replace(/\D/g, "");
