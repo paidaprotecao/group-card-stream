@@ -1,23 +1,33 @@
 {
-  "name": "uazapi → App Fila",
+  "name": "UAZAPI → separar grupo → fila do app",
   "nodes": [
     {
       "parameters": {
         "path": "seu_webhook_uazapi",
-        "responseMode": "responseNode",
+        "responseMode": "lastNode",
         "options": {}
       },
       "id": "webhook-uazapi",
       "name": "Webhook uazapi",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [220, 300],
       "webhookId": "seu_webhook_uazapi"
     },
     {
       "parameters": {
+        "jsCode": "const entrada = $json.body ?? $json;\n\nfunction obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }\nfunction get(o, path) { return path.split('.').reduce((v, k) => obj(v)[k], o); }\nfunction primeiro(paths) {\n  for (const path of paths) {\n    const value = get(entrada, path);\n    if (typeof value === 'string' && value.trim()) return value.trim();\n    if (typeof value === 'number') return String(value);\n  }\n  return null;\n}\nfunction achar(value, teste, depth = 0) {\n  if (depth > 8 || value == null) return null;\n  if (typeof value === 'string' && teste(value)) return value;\n  if (Array.isArray(value)) {\n    for (const item of value) { const achado = achar(item, teste, depth + 1); if (achado) return achado; }\n    return null;\n  }\n  if (typeof value === 'object') {\n    for (const item of Object.values(value)) { const achado = achar(item, teste, depth + 1); if (achado) return achado; }\n  }\n  return null;\n}\n\nlet chatId = primeiro(['chatid','chatId','ChatID','chat.wa_chatid','key.remoteJid','message.key.remoteJid','Data.Key.remoteJid','Data.Key.RemoteJid','Data.Info.Chat','Data.Info.MessageSource.Chat']);\nchatId = chatId ?? achar(entrada, v => /\\d[\\d-]{5,}@g\\.us/i.test(v));\nif (chatId && !/@g\\.us$/i.test(chatId) && /^(120363\\d{8,}|\\d{8,}-\\d{5,})$/.test(chatId)) chatId += '@g.us';\n\nconst text = primeiro(['text','content','caption','message.text','message.content','message.caption','Data.Message.conversation','Data.Message.extendedTextMessage.text','Data.Message.imageMessage.caption','Data.Message.videoMessage.caption']);\nconst sender = primeiro(['sender','senderJid','participant','key.participant','message.key.participant','Data.Key.participant','Data.Info.Sender','from']);\nconst senderPhone = primeiro(['sender_pn','senderPhone','phone','number']);\nconst senderName = primeiro(['senderName','pushName','notifyName','Data.PushName','Data.Info.PushName']);\nconst groupName = primeiro(['chatName','chat.name','chat.wa_name','groupName','group_name']);\nconst externalId = primeiro(['messageid','messageId','message.id','key.id','Data.Key.id','Data.Key.ID']);\n\nif (!chatId) throw new Error('Não encontrei o ID do grupo no webhook da UAZAPI');\n\nreturn [{ json: {\n  chatid: chatId,\n  text,\n  sender,\n  senderPhone,\n  senderName,\n  groupName,\n  messageId: externalId,\n  rawPayload: entrada\n} }];"
+      },
+      "id": "code-separar-grupo",
+      "name": "Separar grupo e mensagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
         "method": "POST",
-        "url": "https://project--091b67d1-9c2a-452d-a16a-cfda681b16ed-dev.lovable.app/api/public/hooks/frete",
+        "url": "https://group-card-stream.lovable.app/api/public/hooks/frete",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -32,25 +42,30 @@
           ]
         },
         "sendBody": true,
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "mensagem",
-              "value": "={{ JSON.stringify($json.body ?? $json) }}"
-            }
-          ]
-        },
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
         "options": {}
       },
       "id": "http-enviar-fila",
       "name": "Enviar para fila",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
-      "position": [450, 300]
+      "position": [680, 300]
     }
   ],
   "connections": {
     "Webhook uazapi": {
+      "main": [
+        [
+          {
+            "node": "Separar grupo e mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar grupo e mensagem": {
       "main": [
         [
           {

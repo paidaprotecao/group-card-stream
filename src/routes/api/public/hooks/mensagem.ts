@@ -23,6 +23,25 @@ export const Route = createFileRoute("/api/public/hooks/mensagem")({
           });
         }
 
+        const payloadRecord = payload && typeof payload === "object" && !Array.isArray(payload)
+          ? payload as Record<string, unknown>
+          : null;
+        if (!payloadRecord || Object.keys(payloadRecord).length === 0 ||
+          (Object.keys(payloadRecord).length === 1 && payloadRecord["message"] == null)) {
+          const resumo = "Payload vazio: a UAZAPI/n8n enviou apenas message=null";
+          console.error(`[mensagem] ${resumo}`);
+          try {
+            const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+            await supabaseAdmin.from("webhook_debug").insert({ hook: "mensagem", payload: payload as never, resumo });
+          } catch (logErr) {
+            console.error("[mensagem] debug log falhou:", logErr);
+          }
+          return Response.json(
+            { success: false, error: resumo },
+            { status: 422 },
+          );
+        }
+
         try {
           const { registrarLinksDoPayload } = await import("@/lib/grupos-caminhao.server");
           const { enfileirarMensagem, temOrigemDeGrupo } = await import("@/lib/fila.server");
