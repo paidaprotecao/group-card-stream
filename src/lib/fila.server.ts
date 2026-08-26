@@ -156,7 +156,36 @@ function pickSenderJid(payload: unknown, paths: string[]): string | null {
   return normalizeJid(byKey ?? findAnyStringDeep(payload, isSenderJid), "sender");
 }
 
+function isNomePessoa(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 60) return false;
+  if (/@(g\.us|s\.whatsapp\.net|c\.us|lid)/i.test(trimmed)) return false;
+  if (/^[\d\s:+\-()]+$/.test(trimmed)) return false;
+  if (/^https?:\/\//i.test(trimmed)) return false;
+  if (/^[{[]/.test(trimmed)) return false;
+  return true;
+}
+
+/** Busca profunda pelo nome de exibição do remetente (senderName/pushName/notifyName). */
+function pickSenderNomeDeep(payload: unknown): string | null {
+  return findStringDeep(
+    payload,
+    (key) => {
+      const k = key.toLowerCase();
+      return (
+        k === "sendername" ||
+        k === "pushname" ||
+        k === "notifyname" ||
+        k === "participantname" ||
+        k === "verifiedname"
+      );
+    },
+    isNomePessoa,
+  );
+}
+
 function isMensagemTexto(value: string): boolean {
+
   const trimmed = value.trim();
   if (!trimmed) return false;
   if (/^[{[]/.test(trimmed)) return false;
