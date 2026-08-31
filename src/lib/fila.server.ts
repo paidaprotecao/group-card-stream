@@ -1109,7 +1109,15 @@ export async function processarFila(maxLotes = 1) {
     .eq("status", "aguardando")
     .lte("fecha_em", nowIso);
 
-  // 2. Nada de paralelismo: se já existe um lote enviando, sai.
+  // 2a. Destrava lotes presos em "enviando" (worker morreu no meio) há mais de 5 min.
+  const limiteTravaIso = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  await supabaseAdmin
+    .from("fila_lotes")
+    .update({ status: "pronto", erro: "reprocessado após travar em envio" })
+    .eq("status", "enviando")
+    .lt("updated_at", limiteTravaIso);
+
+  // 2b. Nada de paralelismo: se já existe um lote enviando (recente), sai.
   const { data: emAndamento } = await supabaseAdmin
     .from("fila_lotes")
     .select("id")
@@ -1118,6 +1126,7 @@ export async function processarFila(maxLotes = 1) {
   if (emAndamento && emAndamento.length > 0) {
     return { ok: true as const, processados: 0, motivo: "já existe um lote em envio" };
   }
+
 
   // Destino padrão: todos os grupos ativos de "Aberto postável".
   const { data: grupos, error: gruposErr } = await supabaseAdmin
