@@ -538,40 +538,62 @@ async function baixarMidiaDaMensagem(
     return { ok: false, error: "Credenciais da uazapi não configuradas para baixar mídia" };
   }
 
-  try {
-    const res = await fetch(`${baseUrl}/message/download`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json", token },
-      body: JSON.stringify(payloadParaDownload(payload)),
-    });
-    if (!res.ok) {
-      const detail = await res.text();
-      return { ok: false, error: `Erro ao baixar mídia: HTTP ${res.status}: ${detail.slice(0, 180)}` };
-    }
+  const corpo = JSON.stringify(payloadParaDownload(payload));
+  // O webhook chega antes da uazapi terminar de salvar a mídia: 404 "Message not found"
+  // é temporário, então tentamos algumas vezes com espera crescente.
+  const TENTATIVAS = 6;
+  let ultimoErro = "Erro ao baixar mídia";
 
-    const contentType = res.headers.get("content-type") ?? "";
-    if (!contentType.toLowerCase().includes("json")) {
-      const bytes = Buffer.from(await res.arrayBuffer());
-      if (bytes.length === 0) return { ok: false, error: "Baixar mídia retornou arquivo vazio" };
-      const mime = contentType || "application/octet-stream";
-      return {
-        ok: true,
-        mediaUrl: `data:${mime};base64,${bytes.toString("base64")}`,
-        tipo: detectarTipo({ mimetype: mime }),
-        docName: null,
-      };
-    }
+  for (let tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {
+    if (tentativa > 1) await new Promise((r) => setTimeout(r, 1500 * (tentativa - 1)));
 
-    const data: unknown = await res.json();
-    const mediaUrl = pickMediaBaixada(data);
-    if (!mediaUrl) return { ok: false, error: "Baixar mídia não retornou arquivo utilizável" };
-    const tipo = detectarTipo(data);
-    const docName = pickStr(data, ["docName", "fileName", "filename", "name", "data.docName", "data.fileName", "Data.FileName"]);
-    return { ok: true, mediaUrl, tipo: tipo === "text" ? null : tipo, docName };
-  } catch {
-    return { ok: false, error: "Falha de rede ao baixar mídia na uazapi" };
+    try {
+      const res = await fetch(`${baseUrl}/message/download`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", token },
+        body: corpo,
+      });
+      if (!res.ok) {
+        const detail = await res.text();
+        ultimoErro = `Erro ao baixar mídia: HTTP ${res.status}: ${detail.slice(0, 180)}`;
+        const temporario = res.status === 404 || res.status === 425 || res.status === 429 || res.status >= 500;
+        if (temporario) continue;
+        return { ok: false, error: ultimoErro };
+      }
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.toLowerCase().includes("json")) {
+        const bytes = Buffer.from(await res.arrayBuffer());
+        if (bytes.length === 0) {
+          ultimoErro = "Baixar mídia retornou arquivo vazio";
+          continue;
+        }
+        const mime = contentType || "application/octet-stream";
+        return {
+          ok: true,
+          mediaUrl: `data:${mime};base64,${bytes.toString("base64")}`,
+          tipo: detectarTipo({ mimetype: mime }),
+          docName: null,
+        };
+      }
+
+      const data: unknown = await res.json();
+      const mediaUrl = pickMediaBaixada(data);
+      if (!mediaUrl) {
+        ultimoErro = "Baixar mídia não retornou arquivo utilizável";
+        continue;
+      }
+      const tipo = detectarTipo(data);
+      const docName = pickStr(data, ["docName", "fileName", "filename", "name", "data.docName", "data.fileName", "Data.FileName"]);
+      return { ok: true, mediaUrl, tipo: tipo === "text" ? null : tipo, docName };
+    } catch {
+      ultimoErro = "Falha de rede ao baixar mídia na uazapi";
+    }
   }
+
+  return { ok: false, error: `${ultimoErro} (após ${TENTATIVAS} tentativas)` };
 }
+
 
 export type MensagemNormalizada = {
   sender: string | null;
