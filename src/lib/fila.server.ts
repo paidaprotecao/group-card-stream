@@ -925,7 +925,24 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const payloadNormalizado = unwrapMensagemPayload(payload);
   const msg = normalizarMensagem(payloadNormalizado);
 
+  const descartavel = ehMensagemDescartavel(payloadNormalizado);
+  if (descartavel.descartar) {
+    return {
+      ok: true,
+      lote_id: null,
+      novo_lote: false,
+      duplicado: false,
+      itens: 0,
+      ignorado: true,
+      motivo: descartavel.motivo,
+      categoria_origem: null,
+      source_chat_id: msg.sourceChatId,
+      source_group_name: msg.sourceGroupName,
+    };
+  }
+
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
 
   // 1) Triagem ANTES de baixar mídia: evita trabalho e flood de grupos que não repostam.
   const triagem = await triarOrigem(supabaseAdmin, msg.sourceChatId, msg.sourceGroupName);
