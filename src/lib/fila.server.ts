@@ -420,10 +420,74 @@ function isProvavelBase64(value: string | null): boolean {
   return Boolean(value && value.length > 120 && /^[A-Za-z0-9+/]+={0,2}$/.test(value));
 }
 
+/** Tipo bruto da mensagem (ExtendedTextMessage, ImageMessage, ReactionMessage...). */
+function tipoBrutoMensagem(payload: unknown): string | null {
+  const direto = pickStr(payload, [
+    "messageType",
+    "message.messageType",
+    "rawPayload.message.messageType",
+    "body.message.messageType",
+    "data.message.messageType",
+    "Data.Message.Type",
+    "Data.messageType",
+  ]);
+  if (direto) return direto;
+  return findStringDeep(
+    payload,
+    (key) => key.toLowerCase() === "messagetype",
+    (value) => value.length > 0 && value.length < 60,
+  );
+}
+
+const TIPOS_IGNORADOS = /(reaction|poll|protocol|revoke|senderkey|ephemeral|keepinchat|pin|history|receipt|call)/i;
+
+/** Reações, votos de enquete e eventos de protocolo não são conteúdo para repostar. */
+export function ehMensagemDescartavel(payload: unknown): { descartar: boolean; motivo?: string } {
+  const tipo = tipoBrutoMensagem(payload);
+  if (tipo && TIPOS_IGNORADOS.test(tipo)) {
+    return { descartar: true, motivo: `Mensagem do tipo "${tipo}" ignorada (reação/enquete/evento)` };
+  }
+  return { descartar: false };
+}
+
+/** Id da mensagem aceito pelo /message/download da uazapi (ex: "5544...:A5B1..."). */
+function pickMessageIdParaDownload(payload: unknown): string | null {
+  const direto = pickStr(payload, [
+    "messageId",
+    "messageid",
+    "message.id",
+    "message.messageid",
+    "message.messageId",
+    "rawPayload.message.id",
+    "rawPayload.messageId",
+    "body.messageId",
+    "body.messageid",
+    "body.message.id",
+    "data.messageId",
+    "data.message.id",
+    "id",
+    "key.id",
+    "message.key.id",
+    "Data.Info.ID",
+  ]);
+  if (direto && direto.length >= 8) return direto;
+  return findStringDeep(
+    payload,
+    (key) => {
+      const k = key.toLowerCase();
+      return k === "messageid" || k === "id";
+    },
+    (value) => value.length >= 12 && /^[A-Za-z0-9:_.-]+$/.test(value),
+  );
+}
+
 function payloadParaDownload(payload: unknown): unknown {
   const unwrapped = unwrapMensagemPayload(payload);
+  const id = pickMessageIdParaDownload(unwrapped) ?? pickMessageIdParaDownload(payload);
+  if (id) return { id };
   return get(unwrapped, "message") ?? get(unwrapped, "body.message") ?? unwrapped;
 }
+
 
 function pickMediaBaixada(payload: unknown): string | null {
   const value = pickStr(payload, [
@@ -861,7 +925,24 @@ export async function enfileirarMensagem(payload: unknown): Promise<EnfileirarRe
   const payloadNormalizado = unwrapMensagemPayload(payload);
   const msg = normalizarMensagem(payloadNormalizado);
 
+  const descartavel = ehMensagemDescartavel(payloadNormalizado);
+  if (descartavel.descartar) {
+    return {
+      ok: true,
+      lote_id: null,
+      novo_lote: false,
+      duplicado: false,
+      itens: 0,
+      ignorado: true,
+      motivo: descartavel.motivo,
+      categoria_origem: null,
+      source_chat_id: msg.sourceChatId,
+      source_group_name: msg.sourceGroupName,
+    };
+  }
+
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
 
   // 1) Triagem ANTES de baixar mídia: evita trabalho e flood de grupos que não repostam.
   const triagem = await triarOrigem(supabaseAdmin, msg.sourceChatId, msg.sourceGroupName);
