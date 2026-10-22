@@ -171,7 +171,7 @@ function KanbanPage() {
               type="button"
               onClick={() => void handleLimparChats()}
               disabled={limpando}
-              title="Limpa o histórico de mensagens dos grupos ativos (roda automaticamente a cada 15 min)"
+              title="Limpa o histórico de mensagens dos grupos ativos"
               className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-60"
             >
               <Eraser className={limpando ? "size-3.5 animate-pulse" : "size-3.5"} />
